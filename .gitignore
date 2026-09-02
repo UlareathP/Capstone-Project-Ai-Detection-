@@ -216,3 +216,46 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+# ---- ML / Deepfake Detection project additions ----
+
+# Model weights & checkpoints
+*.pt
+*.pth
+*.h5
+*.hdf5
+*.ckpt
+*.onnx
+*.pb
+
+# Datasets & large media files
+data/
+datasets/
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.wav
+*.mp3
+
+# Keep small sample/demo images used in docs or README
+*.jpg
+*.jpeg
+*.png
+!docs/**/*.jpg
+!docs/**/*.jpeg
+!docs/**/*.png
+!assets/**/*.jpg
+!assets/**/*.jpeg
+!assets/**/*.png
+
+# Experiment tracking & logs
+runs/
+logs/
+wandb/
+mlruns/
+outputs/
+
+# OS junk
+.DS_Store
