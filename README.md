@@ -1,19 +1,20 @@
 # Deepfake Detection System
 
-An AI system for detecting deepfake and AI-generated content across video, image, and audio using deep learning models trained to distinguish authentic content from manipulated or synthetic media.
+An AI system for detecting deepfake and AI-generated images, built as part of the 
+UC ITS Capstone project. The current MVP focuses on **image-based deepfake detection**, 
+using a fine-tuned pre-trained CNN to classify real vs. AI-generated/manipulated images, 
+with an Explainable AI (XAI) component to visualise model decisions.
 
-## Models
+## Current Scope (MVP)
 
-### 1. Video Deepfake Detection
-Detects manipulated videos by analyzing facial expressions, eye movements, lip synchronization, and frame-to-frame temporal inconsistencies.
+### Image Detection
+Identifies AI-generated or manipulated images using a fine-tuned convolutional neural 
+network, with Grad-CAM visualisation to explain predictions.
 
-### 2. Image Detection
-Identifies AI-generated or manipulated images using spatial and frequency-domain analysis to catch subtle artifacts invisible to the naked eye.
-
-### 3. Audio Detection
-Detects AI-generated or cloned speech by analyzing spectrograms, MFCC features, and other synthetic voice characteristics.
+## Future Work (Stretch Goals)
+- Video deepfake detection (facial expressions, lip sync, temporal inconsistencies)
+- Audio/voice deepfake detection (spectrogram and MFCC-based analysis)
 
 ## Goals
-
-- Detect previously unseen (novel) deepfake generation techniques, not just known ones
-- Maintain accuracy under real-world conditions: video compression, noise, low resolution, changing lighting
+- Detect previously unseen (novel) deepfake generation techniques
+- Maintain accuracy under real-world conditions (compression, noise, lighting variation)
