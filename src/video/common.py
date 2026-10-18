@@ -1,7 +1,9 @@
+import io
 import os
 import csv
+import random
 import torch
-from PIL import Image
+from PIL import Image, ImageFilter
 from torch.utils.data import Dataset
 from torchvision import transforms, models
 from sklearn.model_selection import StratifiedGroupKFold
@@ -15,7 +17,33 @@ SEED = 42
 
 device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 
+class RandomQualityDegrade:
+    """Randomly blur, downscale or JPEG-compress a face crop. Applied to real AND fake
+    faces alike, so image quality stops being a clue and the model must learn the
+    manipulation itself (the raw fakes are blurrier than the raw reals)."""
+
+    def __init__(self, p=0.7):
+        self.p = p
+
+    def __call__(self, img):
+        if random.random() > self.p:
+            return img
+        if random.random() < 0.5:
+            img = img.filter(ImageFilter.GaussianBlur(radius=random.uniform(0.5, 2.5)))
+        if random.random() < 0.5:
+            w, h = img.size
+            s = random.uniform(0.3, 0.8)
+            img = img.resize((max(int(w * s), 16), max(int(h * s), 16)), Image.BILINEAR).resize((w, h), Image.BILINEAR)
+        if random.random() < 0.7:
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=random.randint(20, 75))
+            buf.seek(0)
+            img = Image.open(buf).convert("RGB")
+        return img
+
+
 train_transform = transforms.Compose([
+    RandomQualityDegrade(),
     transforms.Resize((224, 224)),
     transforms.RandomHorizontalFlip(),
     transforms.RandomRotation(10),

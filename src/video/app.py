@@ -18,6 +18,7 @@ from flask import Flask, jsonify, render_template, request
 sys.path.insert(0, os.path.dirname(__file__))
 from common import CLASS_NAMES, MODEL_PATH, build_model, device, eval_transform
 from extract_faces import sample_faces
+from normalize_videos import normalize
 
 FRAMES_TO_ANALYSE = 32
 MAX_UPLOAD_MB = 200
@@ -63,17 +64,15 @@ def analyse(path):
         return {"error": "This file could not be read as a video. Try an MP4, AVI, MOV or MKV file."}
 
     start = time.time()
-    frames = []
-    with torch.no_grad():
-        for idx, total, face in sample_faces(path, FRAMES_TO_ANALYSE):
-            img = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
-            probs = torch.softmax(model(eval_transform(img).unsqueeze(0).to(device)), dim=1)[0]
-            frames.append({
-                "frame": idx,
-                "position": idx / max(total, 1),
-                "p_fake": round(probs[CLASS_NAMES.index("fake")].item(), 4),
-                "thumb": thumbnail(face),
-            })
+    # Re-encode exactly like the training videos so compression matches what the model saw
+    fd, encoded = tempfile.mkstemp(suffix=".mp4")
+    os.close(fd)
+    try:
+        if not normalize(path, encoded):
+            return {"error": "This video could not be re-encoded for analysis."}
+        frames = score_faces(model, encoded)
+    finally:
+        os.remove(encoded)
     if not frames:
         return {"error": "No face was found in the sampled frames. The model needs a clearly visible face."}
 
@@ -90,6 +89,21 @@ def analyse(path):
         "model_updated": model_updated(),
         "frames": frames,
     }
+
+
+def score_faces(model, path):
+    frames = []
+    with torch.no_grad():
+        for idx, total, face in sample_faces(path, FRAMES_TO_ANALYSE):
+            img = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
+            probs = torch.softmax(model(eval_transform(img).unsqueeze(0).to(device)), dim=1)[0]
+            frames.append({
+                "frame": idx,
+                "position": idx / max(total, 1),
+                "p_fake": round(probs[CLASS_NAMES.index("fake")].item(), 4),
+                "thumb": thumbnail(face),
+            })
+    return frames
 
 
 @app.route("/")

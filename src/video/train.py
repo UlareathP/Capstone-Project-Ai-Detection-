@@ -114,7 +114,7 @@ with open(log_path, "a", newline="") as f:
         datetime.now().isoformat(timespec="seconds"),
         "+".join(sorted({v["dataset"] for v in videos})),
         args.test_dataset or "random_identity_split",
-        "resnet18_layer4_unfrozen+augmentation+mean_video_prob",
+        "resnet18_layer4_unfrozen+augmentation+quality_degrade+crf30_videos+mean_video_prob",
         f"{best_val_acc:.4f}",
         f"{best_frame_acc:.4f}",
     ])
