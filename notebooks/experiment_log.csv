@@ -1,2 +1,3 @@
 timestamp,dataset,config,best_val_accuracy
 2026-09-23T18:13:03,data/dataset/rvf10k,resnet18_layer4_unfrozen+augmentation,0.9387
+2026-10-16T19:00:02,data/dataset/rvf10k,"resnet18_layer4_unfrozen+augmentation | val=15% of train, seed=42",0.9305
