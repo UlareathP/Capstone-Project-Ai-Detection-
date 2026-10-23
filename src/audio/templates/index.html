@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deepfake Detector</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --bg: #f4f6fa;
+    --surface: #ffffff;
+    --surface-2: #f8f9fc;
+    --text: #0f172a;
+    --text-2: #475569;
+    --text-3: #94a3b8;
+    --border: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --brand: #4f46e5;
+    --brand-hover: #4338ca;
+    --brand-soft: #eef2ff;
+    --real: #059669;
+    --real-soft: #ecfdf5;
+    --fake: #dc2626;
+    --fake-soft: #fef2f2;
+    --warn: #b45309;
+    --warn-soft: #fffbeb;
+    --shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 4px 16px rgba(15, 23, 42, .06);
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b0f19;
+      --surface: #121826;
+      --surface-2: #0f1522;
+      --text: #e5e9f2;
+      --text-2: #a3adc2;
+      --text-3: #6b7489;
+      --border: #222b3d;
+      --border-strong: #334057;
+      --brand: #818cf8;
+      --brand-hover: #a5b4fc;
+      --brand-soft: #1e2140;
+      --real: #34d399;
+      --real-soft: #0f2a22;
+      --fake: #f87171;
+      --fake-soft: #2e1517;
+      --warn: #fbbf24;
+      --warn-soft: #2b2210;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 16px rgba(0, 0, 0, .25);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 15px/1.55 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  code { font: 13px ui-monospace, "Cascadia Code", Consolas, monospace; background: var(--surface-2); padding: 1px 6px; border-radius: 4px; }
+
+  /* App bar */
+  .appbar { background: var(--surface); border-bottom: 1px solid var(--border); }
+  .appbar-inner { max-width: 1180px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
+  .logo { width: 34px; height: 34px; border-radius: 9px; background: var(--brand); display: grid; place-items: center; flex: none; }
+  .logo svg { width: 20px; height: 20px; color: #fff; }
+  .brand-name { font-weight: 700; font-size: 16px; letter-spacing: -.01em; }
+  .brand-sub { color: var(--text-3); font-size: 13px; }
+  .appbar .spacer { flex: 1; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--text-2);
+          background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; white-space: nowrap; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--real); }
+  .dot.off { background: var(--warn); }
+
+  /* Layout */
+  main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+  .page-head { margin-bottom: 22px; }
+  .page-head h1 { font-size: 26px; line-height: 1.25; letter-spacing: -.02em; margin: 0 0 6px; }
+  .page-head p { margin: 0; color: var(--text-2); max-width: 680px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 20px; align-items: start; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+  .card-head h2 { font-size: 15px; font-weight: 600; margin: 0; }
+  .card-head .hint { color: var(--text-3); font-size: 13px; }
+  .card-body { padding: 20px; }
+  .full { grid-column: 1 / -1; }
+
+  /* Upload */
+  .drop {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    min-height: 230px; padding: 28px 20px; border: 1.5px dashed var(--border-strong); border-radius: 12px;
+    background: var(--surface-2); cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .drop:hover, .drop.over { border-color: var(--brand); background: var(--brand-soft); }
+  .drop-icon { width: 52px; height: 52px; border-radius: 14px; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; margin-bottom: 14px; }
+  .drop-icon svg { width: 26px; height: 26px; }
+  .drop-title { font-weight: 600; margin-bottom: 4px; }
+  .drop-title span { color: var(--brand); }
+  .drop-sub { color: var(--text-3); font-size: 13px; }
+  input[type=file] { display: none; }
+
+  .file-row { display: none; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+  .file-row .ficon { width: 38px; height: 38px; border-radius: 10px; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; flex: none; }
+  .file-row .ficon svg { width: 20px; height: 20px; }
+  .file-meta { min-width: 0; flex: 1; }
+  .file-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-size { color: var(--text-3); font-size: 12.5px; }
+  .link-btn { background: none; border: 0; color: var(--brand); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; padding: 6px 8px; border-radius: 8px; }
+  .link-btn:hover { background: var(--brand-soft); }
+  #preview { display: none; width: 100%; margin-top: 14px; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 16px;
+    background: var(--brand); color: #fff; border: 0; border-radius: 10px; padding: 12px 18px;
+    font: inherit; font-weight: 600; cursor: pointer; transition: background .15s, opacity .15s;
+  }
+  .btn:hover:not(:disabled) { background: var(--brand-hover); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn svg { width: 18px; height: 18px; }
+
+  .notice { display: flex; gap: 10px; padding: 12px 14px; border-radius: 10px; font-size: 13.5px; margin-bottom: 16px; }
+  .notice.warn { background: var(--warn-soft); color: var(--warn); }
+  .notice.error { background: var(--fake-soft); color: var(--fake); margin: 16px 0 0; display: none; }
+  .notice svg { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+
+  .how { margin: 20px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+  .how li { display: flex; gap: 10px; color: var(--text-2); font-size: 13.5px; }
+  .how b { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--surface-2); border: 1px solid var(--border); display: grid; place-items: center; font-size: 12px; color: var(--text-2); }
+
+  /* Results panel */
+  .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 360px; padding: 24px; color: var(--text-3); }
+  .empty svg { width: 44px; height: 44px; margin-bottom: 12px; opacity: .7; }
+  .empty-title { color: var(--text-2); font-weight: 600; margin-bottom: 4px; }
+
+  .loading { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 360px; gap: 18px; }
+  .spinner { width: 40px; height: 40px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--brand); animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .steps { display: grid; gap: 8px; font-size: 13.5px; color: var(--text-3); }
+  .steps div { display: flex; align-items: center; gap: 8px; }
+  .steps div::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--border-strong); }
+  .steps div.active { color: var(--text); font-weight: 500; }
+  .steps div.active::before { background: var(--brand); box-shadow: 0 0 0 4px var(--brand-soft); }
+  .steps div.done { color: var(--text-2); }
+  .steps div.done::before { background: var(--real); }
+
+  .result { display: none; }
+  .verdict { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+  .gauge { position: relative; width: 132px; height: 132px; flex: none; }
+  .gauge svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .gauge circle { fill: none; stroke-width: 11; }
+  .gauge .track { stroke: var(--surface-2); }
+  .gauge .value { stroke-linecap: round; transition: stroke-dashoffset .8s ease; }
+  .gauge-label { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+  .gauge-label b { display: block; font-size: 28px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+  .gauge-label span { font-size: 11.5px; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; }
+  .verdict-text { min-width: 200px; flex: 1; }
+  .tag { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; letter-spacing: .06em; padding: 5px 12px; border-radius: 999px; }
+  .tag svg { width: 15px; height: 15px; }
+  .tag.real { color: var(--real); background: var(--real-soft); }
+  .tag.fake { color: var(--fake); background: var(--fake-soft); }
+  .verdict-text h3 { font-size: 21px; letter-spacing: -.015em; margin: 10px 0 4px; }
+  .verdict-text p { margin: 0; color: var(--text-2); font-size: 13.5px; overflow-wrap: anywhere; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 22px; }
+  .stat { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface-2); }
+  .stat-label { font-size: 12.5px; color: var(--text-3); }
+  .stat-value { font-size: 20px; font-weight: 700; letter-spacing: -.01em; margin-top: 2px; }
+
+  /* Timeline */
+  .chart { position: relative; height: 140px; display: flex; align-items: flex-end; gap: 3px; padding-top: 8px; }
+  .bar { flex: 1; min-width: 3px; border-radius: 3px 3px 0 0; opacity: .9; transition: opacity .1s; position: relative; }
+  .bar:hover { opacity: 1; outline: 2px solid var(--text); outline-offset: 1px; }
+  .threshold { position: absolute; z-index: 1; left: 0; right: 0; bottom: calc((100% - 8px) / 2); border-top: 1.5px dashed var(--text-2); pointer-events: none; }
+  .threshold span { position: absolute; right: 6px; top: -11px; font-size: 11.5px; font-weight: 600; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0 6px; line-height: 20px; }
+  .chart-axis { display: flex; justify-content: space-between; color: var(--text-3); font-size: 12px; margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; }
+  .legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--text-2); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+  /* Faces */
+  .faces { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 12px; }
+  .face { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: var(--surface-2); }
+  .face img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+  .face-foot { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 6px 8px; font-size: 12px; }
+  .face-foot span { color: var(--text-3); }
+  .face-foot b { font-weight: 700; }
+
+  .disclaimer { color: var(--text-3); font-size: 12.5px; margin: 18px 2px 0; }
+
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+    .appbar-inner, main { padding-left: 16px; padding-right: 16px; }
+    .brand-sub { display: none; }
+  }
+  @media (max-width: 520px) {
+    .stats { grid-template-columns: 1fr; }
+    .verdict { justify-content: center; text-align: center; }
+    .page-head h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <div class="appbar-inner">
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
+    </div>
+    <div>
+      <div class="brand-name">Deepfake Detector</div>
+      <div class="brand-sub">UC ITS Capstone · Audio analysis</div>
+    </div>
+    <div class="spacer"></div>
+    {% if model_updated %}
+      <span class="pill" id="model-pill"><span class="dot"></span>Model ready · updated {{ model_updated }}</span>
+    {% else %}
+      <span class="pill"><span class="dot off"></span>No model trained yet</span>
+    {% endif %}
+  </div>
+</header>
+
+<main>
+  <div class="page-head">
+    <h1>Is this voice real or AI-generated?</h1>
+    <p>Upload a recording of someone speaking. The model takes {{ n_frames }} two-second pieces of the speech, checks each one for signs of synthetic voice, and combines the results into one verdict.</p>
+  </div>
+
+  <div class="grid">
+    <!-- Upload -->
+    <section class="card">
+      <div class="card-head"><h2>Upload audio</h2><span class="hint">Stays on your computer</span></div>
+      <div class="card-body">
+        {% if not model_updated %}
+        <div class="notice warn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+          <div>No trained model found. Run <code>src/audio/train.py</code>, then refresh this page.</div>
+        </div>
+        {% endif %}
+
+        <label class="drop" id="drop">
+          <input type="file" id="file" accept="audio/*,.flac,.m4a,.ogg,.opus">
+          <div class="drop-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+          </div>
+          <div class="drop-title"><span>Click to upload</span> or drag and drop</div>
+          <div class="drop-sub">WAV, MP3, M4A, OGG or FLAC · up to {{ max_mb }} MB</div>
+        </label>
+
+        <div class="file-row" id="file-row">
+          <div class="ficon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+          <div class="file-meta"><div class="file-name" id="fname"></div><div class="file-size" id="fsize"></div></div>
+          <button class="link-btn" id="change" type="button">Change</button>
+        </div>
+        <audio id="preview" controls></audio>
+
+        <button class="btn" id="go" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          Analyse audio
+        </button>
+        <div class="notice error" id="error">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+          <div id="error-text"></div>
+        </div>
+
+        <ul class="how">
+          <li><b>1</b>Silence is trimmed and 2-second pieces are taken evenly across the speech.</li>
+          <li><b>2</b>Each piece is turned into a spectrogram, a picture of the sound.</li>
+          <li><b>3</b>A fine-tuned ResNet18 scores every spectrogram, and the scores are averaged.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Result -->
+    <section class="card">
+      <div class="card-head"><h2>Result</h2><span class="hint" id="result-hint"></span></div>
+      <div class="card-body">
+        <div class="empty" id="empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+          <div class="empty-title">No audio analysed yet</div>
+          <div>Upload a recording and press <b>Analyse audio</b> to see the verdict here.</div>
+        </div>
+
+        <div class="loading" id="loading">
+          <div class="spinner"></div>
+          <div class="steps" id="steps">
+            <div data-step="0">Uploading audio</div>
+            <div data-step="1">Cutting the speech into segments</div>
+            <div data-step="2">Scoring each segment with the model</div>
+          </div>
+        </div>
+
+        <div class="result" id="result">
+          <div class="verdict">
+            <div class="gauge">
+              <svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="50"/><circle class="value" id="gauge-value" cx="60" cy="60" r="50"/></svg>
+              <div class="gauge-label"><div><b id="gauge-num"></b><span>confidence</span></div></div>
+            </div>
+            <div class="verdict-text">
+              <span class="tag" id="tag"></span>
+              <h3 id="headline"></h3>
+              <p id="subline"></p>
+            </div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="stat-label">Average fake score</div><div class="stat-value" id="s-pfake"></div></div>
+            <div class="stat"><div class="stat-label">Segments judged fake</div><div class="stat-value" id="s-fakeframes"></div></div>
+            <div class="stat"><div class="stat-label">Segments analysed</div><div class="stat-value" id="s-faces"></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Timeline -->
+    <section class="card full" id="timeline-card" hidden>
+      <div class="card-head">
+        <h2>Fake score across the recording</h2>
+        <div class="legend"><span><i style="background:var(--real)"></i>Looks real</span><span><i style="background:var(--fake)"></i>Looks fake</span></div>
+      </div>
+      <div class="card-body">
+        <div class="chart" id="chart"><div class="threshold"><span>50% threshold</span></div></div>
+        <div class="chart-axis"><span>Start</span><span>Middle</span><span>End</span></div>
+      </div>
+    </section>
+
+    <!-- Faces -->
+    <section class="card full" id="faces-card" hidden>
+      <div class="card-head"><h2>Spectrograms the model examined</h2><span class="hint">Fake score per 2-second segment</span></div>
+      <div class="card-body"><div class="faces" id="faces"></div></div>
+    </section>
+  </div>
+
+  <p class="disclaimer">Research prototype. The model was trained on 1,957 English speech clips from ASVspoof 5 (955 real, 1,002 synthetic). Results on other languages, music, noisy recordings or voice-cloning tools it has not seen are less reliable. Do not treat a verdict as proof.</p>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const fileIn = $("file"), drop = $("drop"), go = $("go");
+const CIRC = 2 * Math.PI * 50;
+let chosen = null, stepTimer = null;
+
+function setState(state) {
+  $("empty").style.display = state === "empty" ? "flex" : "none";
+  $("loading").style.display = state === "loading" ? "flex" : "none";
+  $("result").style.display = state === "result" ? "block" : "none";
+  $("timeline-card").hidden = $("faces-card").hidden = state !== "result";
+}
+
+function showError(msg) {
+  $("error-text").textContent = msg;
+  $("error").style.display = msg ? "flex" : "none";
+}
+
+function pick(f) {
+  if (!f) return;
+  chosen = f;
+  $("fname").textContent = f.name;
+  $("fsize").textContent = (f.size / 1048576).toFixed(1) + " MB";
+  drop.style.display = "none";
+  $("file-row").style.display = "flex";
+  const v = $("preview"); v.src = URL.createObjectURL(f); v.style.display = "block";
+  go.disabled = false; showError(""); setState("empty"); $("result-hint").textContent = "";
+}
+
+fileIn.onchange = () => pick(fileIn.files[0]);
+$("change").onclick = () => { fileIn.value = ""; fileIn.click(); };
+["dragover", "dragenter"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", ev => pick(ev.dataTransfer.files[0]));
+
+function runSteps() {
+  const steps = [...$("steps").children];
+  let i = 0;
+  const paint = () => steps.forEach((s, j) => s.className = j < i ? "done" : j === i ? "active" : "");
+  paint();
+  stepTimer = setInterval(() => { if (i < steps.length - 1) { i++; paint(); } }, 2500);
+}
+
+const color = p => p >= 0.5 ? "var(--fake)" : "var(--real)";
+const pct = p => (p * 100).toFixed(1) + "%";
+
+function render(r) {
+  const fake = r.verdict === "fake";
+  const tone = fake ? "var(--fake)" : "var(--real)";
+  const g = $("gauge-value");
+  g.style.stroke = tone;
+  g.style.strokeDasharray = CIRC;
+  g.style.strokeDashoffset = CIRC;
+  requestAnimationFrame(() => requestAnimationFrame(() => g.style.strokeDashoffset = CIRC * (1 - r.confidence)));
+  $("gauge-num").textContent = Math.round(r.confidence * 100) + "%";
+  $("gauge-num").style.color = tone;
+
+  $("tag").className = "tag " + r.verdict;
+  $("tag").innerHTML = fake
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 8v4M12 16h.01"/><circle cx="12" cy="12" r="9"/></svg>DEEPFAKE'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>REAL';
+  $("headline").textContent = fake ? "This voice is likely AI-generated" : "This voice sounds authentic";
+  $("subline").textContent = `${chosen.name} · ${r.faces_found} segments analysed in ${r.elapsed_sec}s`;
+  $("s-pfake").textContent = pct(r.p_fake);
+  $("s-pfake").style.color = color(r.p_fake);
+  $("s-fakeframes").textContent = `${r.fake_frames} / ${r.faces_found}`;
+  $("s-faces").textContent = `${r.faces_found} / ${r.frames_sampled}`;
+  $("result-hint").textContent = r.model_updated ? "Model updated " + r.model_updated : "";
+
+  const chart = $("chart");
+  chart.querySelectorAll(".bar").forEach(b => b.remove());
+  r.frames.forEach(f => {
+    const b = document.createElement("div");
+    b.className = "bar";
+    b.style.height = Math.max(f.p_fake * 100, 2) + "%";
+    b.style.background = color(f.p_fake);
+    b.title = `${f.frame}s (${Math.round(f.position * 100)}% through): fake score ${pct(f.p_fake)}`;
+    chart.appendChild(b);
+  });
+
+  $("faces").innerHTML = r.frames.map(f => `
+    <div class="face" title="Starts at ${f.frame}s">
+      <img src="${f.thumb}" alt="Spectrogram from ${f.frame}s">
+      <div class="face-foot"><span>${f.frame}s</span><b style="color:${color(f.p_fake)}">${pct(f.p_fake)}</b></div>
+    </div>`).join("");
+
+  setState("result");
+}
+
+go.onclick = async () => {
+  go.disabled = true; showError(""); setState("loading"); runSteps();
+  const body = new FormData(); body.append("audio", chosen);
+  try {
+    const res = await fetch("/predict", { method: "POST", body });
+    const r = await res.json().catch(() => ({ error: "The server returned an unexpected response." }));
+    if (r.error) { showError(r.error); setState("empty"); return; }
+    render(r);
+  } catch (e) {
+    showError("Could not reach the app. Is it still running in your terminal?");
+    setState("empty");
+  } finally {
+    clearInterval(stepTimer);
+    go.disabled = false;
+  }
+};
+
+setState("empty");
+</script>
+</body>
+</html>
