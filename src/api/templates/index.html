@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deepfake Detector</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --bg: #f4f6fa;
+    --surface: #ffffff;
+    --surface-2: #f8f9fc;
+    --text: #0f172a;
+    --text-2: #475569;
+    --text-3: #94a3b8;
+    --border: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --brand: #4f46e5;
+    --brand-hover: #4338ca;
+    --brand-soft: #eef2ff;
+    --real: #059669;
+    --real-soft: #ecfdf5;
+    --fake: #dc2626;
+    --fake-soft: #fef2f2;
+    --warn: #b45309;
+    --warn-soft: #fffbeb;
+    --shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 4px 16px rgba(15, 23, 42, .06);
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b0f19;
+      --surface: #121826;
+      --surface-2: #0f1522;
+      --text: #e5e9f2;
+      --text-2: #a3adc2;
+      --text-3: #6b7489;
+      --border: #222b3d;
+      --border-strong: #334057;
+      --brand: #818cf8;
+      --brand-hover: #a5b4fc;
+      --brand-soft: #1e2140;
+      --real: #34d399;
+      --real-soft: #0f2a22;
+      --fake: #f87171;
+      --fake-soft: #2e1517;
+      --warn: #fbbf24;
+      --warn-soft: #2b2210;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 16px rgba(0, 0, 0, .25);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 15px/1.55 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  code { font: 13px ui-monospace, "Cascadia Code", Consolas, monospace; background: var(--surface-2); padding: 1px 6px; border-radius: 4px; }
+  [hidden] { display: none !important; }
+
+  /* App bar */
+  .appbar { background: var(--surface); border-bottom: 1px solid var(--border); }
+  .appbar-inner { max-width: 1180px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
+  .logo { width: 34px; height: 34px; border-radius: 9px; background: var(--brand); display: grid; place-items: center; flex: none; }
+  .logo svg { width: 20px; height: 20px; color: #fff; }
+  .brand-name { font-weight: 700; font-size: 16px; letter-spacing: -.01em; }
+  .brand-sub { color: var(--text-3); font-size: 13px; }
+  .appbar .spacer { flex: 1; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--text-2);
+          background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; white-space: nowrap; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--real); }
+  .dot.off { background: var(--warn); }
+
+  /* Tabs */
+  .tabs { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 22px; background: var(--surface); border: 1px solid var(--border);
+          border-radius: 12px; box-shadow: var(--shadow); }
+  .tab { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; color: var(--text-2); font: inherit; font-weight: 600;
+         padding: 9px 18px; border-radius: 9px; cursor: pointer; transition: background .15s, color .15s; }
+  .tab svg { width: 18px; height: 18px; }
+  .tab:hover { color: var(--text); background: var(--surface-2); }
+  .tab[aria-selected="true"] { background: var(--brand); color: #fff; }
+  .tab .tdot { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
+  .tab[aria-selected="true"] .tdot { background: #fff; }
+
+  /* Layout */
+  main { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+  .page-head { margin-bottom: 22px; }
+  .page-head h1 { font-size: 26px; line-height: 1.25; letter-spacing: -.02em; margin: 0 0 6px; }
+  .page-head p { margin: 0; color: var(--text-2); max-width: 680px; }
+  .grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 20px; align-items: start; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+  .card-head h2 { font-size: 15px; font-weight: 600; margin: 0; }
+  .card-head .hint { color: var(--text-3); font-size: 13px; }
+  .card-body { padding: 20px; }
+  .full { grid-column: 1 / -1; }
+
+  /* Upload */
+  .drop {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    min-height: 230px; padding: 28px 20px; border: 1.5px dashed var(--border-strong); border-radius: 12px;
+    background: var(--surface-2); cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .drop:hover, .drop.over { border-color: var(--brand); background: var(--brand-soft); }
+  .drop-icon { width: 52px; height: 52px; border-radius: 14px; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; margin-bottom: 14px; }
+  .drop-icon svg { width: 26px; height: 26px; }
+  .drop-title { font-weight: 600; margin-bottom: 4px; }
+  .drop-title span { color: var(--brand); }
+  .drop-sub { color: var(--text-3); font-size: 13px; }
+  input[type=file] { display: none; }
+
+  .file-row { display: none; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+  .file-row .ficon { width: 38px; height: 38px; border-radius: 10px; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; flex: none; }
+  .file-row .ficon svg { width: 20px; height: 20px; }
+  .file-meta { min-width: 0; flex: 1; }
+  .file-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-size { color: var(--text-3); font-size: 12.5px; }
+  .link-btn { background: none; border: 0; color: var(--brand); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; padding: 6px 8px; border-radius: 8px; }
+  .link-btn:hover { background: var(--brand-soft); }
+  .preview { margin-top: 14px; }
+  .preview img, .preview video { display: block; width: 100%; max-height: 300px; border-radius: 12px; }
+  .preview img { object-fit: contain; background: var(--surface-2); }
+  .preview video { background: #000; }
+  .preview audio { width: 100%; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 16px;
+    background: var(--brand); color: #fff; border: 0; border-radius: 10px; padding: 12px 18px;
+    font: inherit; font-weight: 600; cursor: pointer; transition: background .15s, opacity .15s;
+  }
+  .btn:hover:not(:disabled) { background: var(--brand-hover); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn svg { width: 18px; height: 18px; }
+
+  .notice { display: flex; gap: 10px; padding: 12px 14px; border-radius: 10px; font-size: 13.5px; margin-bottom: 16px; }
+  .notice.warn { background: var(--warn-soft); color: var(--warn); }
+  .notice.error { background: var(--fake-soft); color: var(--fake); margin: 16px 0 0; }
+  .notice svg { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+
+  .how { margin: 20px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+  .how li { display: flex; gap: 10px; color: var(--text-2); font-size: 13.5px; }
+  .how b { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--surface-2); border: 1px solid var(--border); display: grid; place-items: center; font-size: 12px; color: var(--text-2); }
+
+  /* Results panel */
+  .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 360px; padding: 24px; color: var(--text-3); }
+  .empty svg { width: 44px; height: 44px; margin-bottom: 12px; opacity: .7; }
+  .empty-title { color: var(--text-2); font-weight: 600; margin-bottom: 4px; }
+
+  .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 360px; gap: 18px; }
+  .spinner { width: 40px; height: 40px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--brand); animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .steps { display: grid; gap: 8px; font-size: 13.5px; color: var(--text-3); }
+  .steps div { display: flex; align-items: center; gap: 8px; }
+  .steps div::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--border-strong); }
+  .steps div.active { color: var(--text); font-weight: 500; }
+  .steps div.active::before { background: var(--brand); box-shadow: 0 0 0 4px var(--brand-soft); }
+  .steps div.done { color: var(--text-2); }
+  .steps div.done::before { background: var(--real); }
+
+  .verdict { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+  .gauge { position: relative; width: 132px; height: 132px; flex: none; }
+  .gauge svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .gauge circle { fill: none; stroke-width: 11; }
+  .gauge .track { stroke: var(--surface-2); }
+  .gauge .value { stroke-linecap: round; transition: stroke-dashoffset .8s ease; }
+  .gauge-label { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+  .gauge-label b { display: block; font-size: 28px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+  .gauge-label span { font-size: 11.5px; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; }
+  .verdict-text { min-width: 200px; flex: 1; }
+  .tag { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; letter-spacing: .06em; padding: 5px 12px; border-radius: 999px; }
+  .tag svg { width: 15px; height: 15px; }
+  .tag.real { color: var(--real); background: var(--real-soft); }
+  .tag.fake { color: var(--fake); background: var(--fake-soft); }
+  .verdict-text h3 { font-size: 21px; letter-spacing: -.015em; margin: 10px 0 4px; }
+  .verdict-text p { margin: 0; color: var(--text-2); font-size: 13.5px; overflow-wrap: anywhere; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 22px; }
+  .stat { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface-2); }
+  .stat-label { font-size: 12.5px; color: var(--text-3); }
+  .stat-value { font-size: 20px; font-weight: 700; letter-spacing: -.01em; margin-top: 2px; }
+
+  /* Timeline */
+  .chart { position: relative; height: 140px; display: flex; align-items: flex-end; gap: 3px; padding-top: 8px; }
+  .bar { flex: 1; min-width: 3px; border-radius: 3px 3px 0 0; opacity: .9; transition: opacity .1s; position: relative; }
+  .bar:hover { opacity: 1; outline: 2px solid var(--text); outline-offset: 1px; }
+  .threshold { position: absolute; z-index: 1; left: 0; right: 0; bottom: calc((100% - 8px) / 2); border-top: 1.5px dashed var(--text-2); pointer-events: none; }
+  .threshold span { position: absolute; right: 6px; top: -11px; font-size: 11.5px; font-weight: 600; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0 6px; line-height: 20px; }
+  .chart-axis { display: flex; justify-content: space-between; color: var(--text-3); font-size: 12px; margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; }
+  .legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--text-2); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+  /* Samples (faces / spectrograms) */
+  .samples { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 12px; }
+  .samples.single { grid-template-columns: minmax(0, 224px); }
+  .sample { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: var(--surface-2); }
+  .sample img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+  .sample-foot { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 6px 8px; font-size: 12px; }
+  .sample-foot span { color: var(--text-3); }
+  .sample-foot b { font-weight: 700; }
+
+  .disclaimer { color: var(--text-3); font-size: 12.5px; margin: 18px 2px 0; }
+
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+    .appbar-inner, main { padding-left: 16px; padding-right: 16px; }
+    .brand-sub { display: none; }
+  }
+  @media (max-width: 520px) {
+    .stats { grid-template-columns: 1fr; }
+    .verdict { justify-content: center; text-align: center; }
+    .page-head h1 { font-size: 22px; }
+    .tabs { display: flex; }
+    .tab { flex: 1; justify-content: center; padding: 9px 8px; }
+    .appbar .pill { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <div class="appbar-inner">
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
+    </div>
+    <div>
+      <div class="brand-name">Deepfake Detector</div>
+      <div class="brand-sub">UC ITS Capstone · Image, video and audio analysis</div>
+    </div>
+    <div class="spacer"></div>
+    <span class="pill" id="model-pill"><span class="dot" id="model-dot"></span><span id="model-text"></span></span>
+  </div>
+</header>
+
+<main>
+  <div class="tabs" role="tablist" aria-label="Media type">
+    <button class="tab" role="tab" data-kind="image" id="tab-image">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
+      Image<span class="tdot" hidden></span>
+    </button>
+    <button class="tab" role="tab" data-kind="video" id="tab-video">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="15" height="14" rx="2"/><path d="M17 10l5-3v10l-5-3z"/></svg>
+      Video<span class="tdot" hidden></span>
+    </button>
+    <button class="tab" role="tab" data-kind="audio" id="tab-audio">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      Audio<span class="tdot" hidden></span>
+    </button>
+  </div>
+
+  <div class="page-head">
+    <h1 id="title"></h1>
+    <p id="intro"></p>
+  </div>
+
+  <div class="grid" role="tabpanel">
+    <!-- Upload -->
+    <section class="card">
+      <div class="card-head"><h2 id="upload-title"></h2><span class="hint">Stays on this computer</span></div>
+      <div class="card-body">
+        <div class="notice warn" id="unavailable" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+          <div id="unavailable-text"></div>
+        </div>
+
+        <label class="drop" id="drop">
+          <input type="file" id="file">
+          <div class="drop-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+          </div>
+          <div class="drop-title"><span>Click to upload</span> or drag and drop</div>
+          <div class="drop-sub" id="formats"></div>
+        </label>
+
+        <div class="file-row" id="file-row">
+          <div class="ficon" id="file-icon"></div>
+          <div class="file-meta"><div class="file-name" id="fname"></div><div class="file-size" id="fsize"></div></div>
+          <button class="link-btn" id="change" type="button">Change</button>
+        </div>
+        <div class="preview" id="preview"></div>
+
+        <button class="btn" id="go" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <span id="go-label"></span>
+        </button>
+        <div class="notice error" id="error" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+          <div id="error-text"></div>
+        </div>
+
+        <ul class="how" id="how"></ul>
+      </div>
+    </section>
+
+    <!-- Result -->
+    <section class="card">
+      <div class="card-head"><h2>Result</h2><span class="hint" id="result-hint"></span></div>
+      <div class="card-body">
+        <div class="empty" id="empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+          <div class="empty-title" id="empty-title"></div>
+          <div id="empty-text"></div>
+        </div>
+
+        <div class="loading" id="loading" hidden>
+          <div class="spinner"></div>
+          <div class="steps" id="steps"></div>
+        </div>
+
+        <div id="result" hidden>
+          <div class="verdict">
+            <div class="gauge">
+              <svg viewBox="0 0 120 120"><circle class="track" cx="60" cy="60" r="50"/><circle class="value" id="gauge-value" cx="60" cy="60" r="50"/></svg>
+              <div class="gauge-label"><div><b id="gauge-num"></b><span>confidence</span></div></div>
+            </div>
+            <div class="verdict-text">
+              <span class="tag" id="tag"></span>
+              <h3 id="headline"></h3>
+              <p id="subline"></p>
+            </div>
+          </div>
+          <div class="stats" id="stats"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Timeline (video and audio) -->
+    <section class="card full" id="timeline-card" hidden>
+      <div class="card-head">
+        <h2 id="timeline-title"></h2>
+        <div class="legend"><span><i style="background:var(--real)"></i>Looks real</span><span><i style="background:var(--fake)"></i>Looks fake</span></div>
+      </div>
+      <div class="card-body">
+        <div class="chart" id="chart"><div class="threshold"><span>50% threshold</span></div></div>
+        <div class="chart-axis"><span>Start</span><span>Middle</span><span>End</span></div>
+      </div>
+    </section>
+
+    <!-- What the model looked at -->
+    <section class="card full" id="samples-card" hidden>
+      <div class="card-head"><h2 id="samples-title"></h2><span class="hint" id="samples-hint"></span></div>
+      <div class="card-body"><div class="samples" id="samples"></div></div>
+    </section>
+  </div>
+
+  <p class="disclaimer" id="disclaimer"></p>
+</main>
+
+<script>
+const SETTINGS = {{ settings|tojson }};
+const $ = id => document.getElementById(id);
+const CIRC = 2 * Math.PI * 50;
+const pct = p => (p * 100).toFixed(1) + "%";
+const color = p => p >= 0.5 ? "var(--fake)" : "var(--real)";
+
+const ICONS = {
+  image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>',
+  video: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="15" height="14" rx="2"/><path d="M17 10l5-3v10l-5-3z"/></svg>',
+  audio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+};
+
+// Everything that differs between the three tabs. The result format is the same for all.
+const KINDS = {
+  image: {
+    name: "Image",
+    title: "Is this photo real or AI-generated?",
+    intro: () => "Upload a photo with a visible face. The model finds the face, checks it for signs of AI generation, and gives one verdict.",
+    accept: "image/*", formats: "JPG, PNG or WEBP", noun: "image",
+    how: ["The photo is re-saved in the same format as the training images.",
+          "A face detector crops the largest face, the same way as in videos.",
+          "A fine-tuned ResNet18 scores the face as real or fake."],
+    steps: ["Uploading image", "Detecting the face", "Scoring the face with the model"],
+    headline: { fake: "This image is likely AI-generated", real: "This image looks authentic" },
+    subline: r => `face analysed in ${r.elapsed_sec}s`,
+    stats: r => [["Fake score", pct(r.p_fake), color(r.p_fake)], ["Real score", pct(1 - r.p_fake), color(r.p_fake)], ["Analysis time", r.elapsed_sec + "s"]],
+    timeline: null,
+    samplesTitle: "Face the model examined", samplesHint: "Cropped exactly as the model saw it",
+    sampleLabel: () => "Fake score",
+    disclaimer: "Research prototype. The image model was trained on the rvf10k dataset: real faces from FFHQ and fake faces generated by StyleGAN. Results on face swaps, edited photos, other image generators or unusual lighting are less reliable. Do not treat a verdict as proof.",
+  },
+  video: {
+    name: "Video",
+    title: "Is this video real or a deepfake?",
+    intro: s => `Upload a short clip with a visible face. The model samples ${s.samples} frames, checks each face for manipulation, and combines the results into one verdict.`,
+    accept: "video/*", formats: "MP4, AVI, MOV or MKV", noun: "video",
+    how: ["Frames are sampled evenly across the whole video.",
+          "A face detector crops the face in each frame.",
+          "A fine-tuned ResNet18 scores every face, and the scores are averaged."],
+    steps: ["Uploading video", "Detecting faces in sampled frames", "Scoring each face with the model"],
+    headline: { fake: "This video is likely a deepfake", real: "This video looks authentic" },
+    subline: r => `${r.faces_found} faces analysed in ${r.elapsed_sec}s`,
+    stats: r => [["Average fake score", pct(r.p_fake), color(r.p_fake)], ["Frames judged fake", `${r.fake_frames} / ${r.faces_found}`], ["Faces analysed", `${r.faces_found} / ${r.frames_sampled}`]],
+    timeline: { title: "Fake score across the video", bar: f => `Frame ${f.frame}` },
+    samplesTitle: "Faces the model examined", samplesHint: "Fake score per frame",
+    sampleLabel: f => "#" + f.frame,
+    disclaimer: "Research prototype. The video model was trained on 98 DeepFaceLab face-swap videos (49 real, 49 fake), so results on other deepfake methods, heavily compressed footage or unusual lighting are less reliable. Do not treat a verdict as proof.",
+  },
+  audio: {
+    name: "Audio",
+    title: "Is this voice real or AI-generated?",
+    intro: s => `Upload a recording of someone speaking. The model takes ${s.samples} two-second pieces of the speech, checks each one for signs of synthetic voice, and combines the results into one verdict.`,
+    accept: "audio/*,.flac,.m4a,.ogg,.opus", formats: "WAV, MP3, M4A, OGG or FLAC", noun: "audio",
+    how: ["Silence is trimmed and 2-second pieces are taken evenly across the speech.",
+          "Each piece is turned into a spectrogram, a picture of the sound.",
+          "A fine-tuned ResNet18 scores every spectrogram, and the scores are averaged."],
+    steps: ["Uploading audio", "Cutting the speech into segments", "Scoring each segment with the model"],
+    headline: { fake: "This voice is likely AI-generated", real: "This voice sounds authentic" },
+    subline: r => `${r.faces_found} segments analysed in ${r.elapsed_sec}s`,
+    stats: r => [["Average fake score", pct(r.p_fake), color(r.p_fake)], ["Segments judged fake", `${r.fake_frames} / ${r.faces_found}`], ["Segments analysed", `${r.faces_found} / ${r.frames_sampled}`]],
+    timeline: { title: "Fake score across the recording", bar: f => `${f.frame}s` },
+    samplesTitle: "Spectrograms the model examined", samplesHint: "Fake score per 2-second segment",
+    sampleLabel: f => f.frame + "s",
+    disclaimer: "Research prototype. The audio model was trained on English speech from ASVspoof 5. On voice-faking methods it has never heard it catches only about 4 in 10 fakes, and results on other languages, music or noisy recordings are less reliable. Do not treat a verdict as proof.",
+  },
+};
+
+// Each tab keeps its own file and result, so switching tabs doesn't lose anything
+const state = { image: {}, video: {}, audio: {} };
+let current = null, stepTimer = null;
+
+function show(id, on) { $(id).hidden = !on; }
+
+function setPanel(panel) {
+  show("empty", panel === "empty");
+  show("loading", panel === "loading");
+  show("result", panel === "result");
+  show("timeline-card", panel === "result" && !!KINDS[current].timeline);
+  show("samples-card", panel === "result");
+}
+
+function showError(msg) {
+  $("error-text").textContent = msg || "";
+  show("error", !!msg);
+}
+
+function paintModelStatus() {
+  const s = SETTINGS[current];
+  $("model-dot").className = "dot" + (s.available ? "" : " off");
+  $("model-text").textContent = s.available
+    ? `${KINDS[current].name} model ready · updated ${s.model_updated}`
+    : `${KINDS[current].name} model not available`;
+  $("unavailable-text").textContent = s.available ? "" : s.reason;
+  show("unavailable", !s.available);
+  document.querySelectorAll(".tab").forEach(t => t.querySelector(".tdot").hidden = SETTINGS[t.dataset.kind].available);
+}
+
+function selectTab(kind) {
+  if (!KINDS[kind]) kind = "image";
+  current = kind;
+  const k = KINDS[kind], s = SETTINGS[kind], st = state[kind];
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.kind === kind));
+  try { history.replaceState(null, "", "#" + kind); } catch (e) {}
+
+  $("title").textContent = k.title;
+  $("intro").textContent = k.intro(s);
+  $("upload-title").textContent = `Upload ${k.noun}`;
+  $("file").accept = k.accept;
+  $("formats").textContent = `${k.formats} · up to ${s.max_mb} MB`;
+  $("file-icon").innerHTML = ICONS[kind];
+  $("go-label").textContent = `Analyse ${k.noun}`;
+  $("how").innerHTML = k.how.map((t, i) => `<li><b>${i + 1}</b>${t}</li>`).join("");
+  $("steps").innerHTML = k.steps.map((t, i) => `<div data-step="${i}">${t}</div>`).join("");
+  $("empty-title").textContent = `No ${k.noun} analysed yet`;
+  $("empty-text").innerHTML = `Upload a file and press <b>Analyse ${k.noun}</b> to see the verdict here.`;
+  $("disclaimer").textContent = k.disclaimer;
+  paintModelStatus();
+
+  // Restore this tab's own file, preview and result
+  $("drop").style.display = st.file ? "none" : "flex";
+  $("file-row").style.display = st.file ? "flex" : "none";
+  $("preview").innerHTML = "";
+  if (st.file) {
+    $("fname").textContent = st.file.name;
+    $("fsize").textContent = (st.file.size / 1048576).toFixed(1) + " MB";
+    const el = document.createElement(kind === "image" ? "img" : kind);
+    el.src = st.url;
+    if (kind === "image") el.alt = "Preview of the chosen image";
+    else el.controls = true;
+    if (kind === "video") { el.muted = true; el.playsInline = true; }
+    $("preview").appendChild(el);
+  }
+  $("go").disabled = !st.file || !s.available || !!st.busy;
+  showError(st.error);
+  $("result-hint").textContent = st.result && st.result.model_updated ? "Model updated " + st.result.model_updated : "";
+  if (st.busy) { setPanel("loading"); }
+  else if (st.result) { render(st.result); }
+  else { setPanel("empty"); }
+}
+
+function pick(f) {
+  if (!f) return;
+  const st = state[current], s = SETTINGS[current];
+  if (f.size > s.max_mb * 1048576) {
+    st.error = `That file is larger than ${s.max_mb} MB.`;
+    showError(st.error);
+    return;
+  }
+  if (st.url) URL.revokeObjectURL(st.url);
+  st.file = f; st.url = URL.createObjectURL(f); st.result = null; st.error = "";
+  selectTab(current);
+}
+
+function runSteps() {
+  const steps = [...$("steps").children];
+  let i = 0;
+  const paint = () => steps.forEach((s, j) => s.className = j < i ? "done" : j === i ? "active" : "");
+  paint();
+  clearInterval(stepTimer);
+  stepTimer = setInterval(() => { if (i < steps.length - 1) { i++; paint(); } }, 2500);
+}
+
+function render(r) {
+  const k = KINDS[current], st = state[current];
+  const fake = r.verdict === "fake";
+  const tone = fake ? "var(--fake)" : "var(--real)";
+  const g = $("gauge-value");
+  g.style.stroke = tone;
+  g.style.strokeDasharray = CIRC;
+  g.style.strokeDashoffset = CIRC;
+  requestAnimationFrame(() => requestAnimationFrame(() => g.style.strokeDashoffset = CIRC * (1 - r.confidence)));
+  $("gauge-num").textContent = Math.round(r.confidence * 100) + "%";
+  $("gauge-num").style.color = tone;
+
+  $("tag").className = "tag " + r.verdict;
+  $("tag").innerHTML = fake
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 8v4M12 16h.01"/><circle cx="12" cy="12" r="9"/></svg>' + (current === "video" ? "DEEPFAKE" : "FAKE")
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>REAL';
+  $("headline").textContent = k.headline[r.verdict];
+  $("subline").textContent = `${st.file ? st.file.name + " · " : ""}${k.subline(r)}`;
+
+  $("stats").innerHTML = "";
+  k.stats(r).forEach(([label, value, c]) => {
+    const div = document.createElement("div");
+    div.className = "stat";
+    div.innerHTML = '<div class="stat-label"></div><div class="stat-value"></div>';
+    div.children[0].textContent = label;
+    div.children[1].textContent = value;
+    if (c) div.children[1].style.color = c;
+    $("stats").appendChild(div);
+  });
+
+  const chart = $("chart");
+  chart.querySelectorAll(".bar").forEach(b => b.remove());
+  if (k.timeline) {
+    $("timeline-title").textContent = k.timeline.title;
+    r.frames.forEach(f => {
+      const b = document.createElement("div");
+      b.className = "bar";
+      b.style.height = Math.max(f.p_fake * 100, 2) + "%";
+      b.style.background = color(f.p_fake);
+      b.title = `${k.timeline.bar(f)} (${Math.round(f.position * 100)}% through): fake score ${pct(f.p_fake)}`;
+      chart.appendChild(b);
+    });
+  }
+
+  $("samples-title").textContent = k.samplesTitle;
+  $("samples-hint").textContent = k.samplesHint;
+  $("samples").className = "samples" + (r.frames.length === 1 ? " single" : "");
+  $("samples").innerHTML = r.frames.map(f => `
+    <div class="sample">
+      <img src="${f.thumb}" alt="">
+      <div class="sample-foot"><span>${k.sampleLabel(f)}</span><b style="color:${color(f.p_fake)}">${pct(f.p_fake)}</b></div>
+    </div>`).join("");
+
+  $("result-hint").textContent = r.model_updated ? "Model updated " + r.model_updated : "";
+  setPanel("result");
+}
+
+async function analyse() {
+  const kind = current, st = state[kind];
+  st.busy = true; st.error = ""; st.result = null;
+  selectTab(kind);
+  runSteps();
+  const body = new FormData();
+  body.append("file", st.file);
+  try {
+    const res = await fetch(`/api/predict/${kind}`, { method: "POST", body });
+    const r = await res.json().catch(() => ({ error: "The server returned an unexpected response." }));
+    if (r.error) st.error = r.error; else st.result = r;
+  } catch (e) {
+    st.error = "Could not reach the server. Is it still running in your terminal?";
+  } finally {
+    st.busy = false;
+    clearInterval(stepTimer);
+    if (current === kind) selectTab(kind);  // if the user switched tabs, the result waits for them
+  }
+}
+
+const fileIn = $("file"), drop = $("drop");
+fileIn.onchange = () => { pick(fileIn.files[0]); fileIn.value = ""; };
+$("change").onclick = () => fileIn.click();
+["dragover", "dragenter"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", ev => pick(ev.dataTransfer.files[0]));
+$("go").onclick = analyse;
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => selectTab(t.dataset.kind));
+
+selectTab((location.hash || "#image").slice(1));
+</script>
+</body>
+</html>

@@ -1,19 +1,21 @@
-"""One API server for the mobile app: image, video and audio detection in one place.
+"""One server for image, video and audio detection: a web page with Image | Video |
+Audio tabs at "/", and the JSON API used by the mobile app at "/api/...".
 
 It loads the existing pipelines (src/image/app.py, src/video/app.py, src/audio/app.py)
-and calls their analyse() functions, so results are identical to the web apps.
+and calls their analyse() functions, so results are identical to the separate web apps.
 It listens on all network interfaces so a phone on the same Wi-Fi can reach it.
 
 Usage (from the repo root):
     python src/api/server.py
-then point the mobile app at http://<this-computer's-IP>:8000
+then open http://127.0.0.1:8000 in a browser,
+or point the mobile app at http://<this-computer's-IP>:8000
 """
 import os
 import sys
 import socket
 import tempfile
 import importlib.util
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, render_template, request
 
 SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PORT = 8000
@@ -60,6 +62,20 @@ def status(kind):
     if not os.path.exists(p["module"].MODEL_PATH):
         return {"available": False, "reason": f"{p['module'].MODEL_PATH} not found - train this model first."}
     return {"available": True, "model_updated": p["module"].model_updated()}
+
+
+def page_settings(kind):
+    """What the web page needs to know about one pipeline: is it ready, upload limit, samples per file."""
+    module = PIPELINES[kind]["module"]
+    samples = {"image": 1,
+               "video": getattr(module, "FRAMES_TO_ANALYSE", None),
+               "audio": getattr(module, "SEGMENTS_PER_CLIP", None)}[kind]
+    return {**status(kind), "max_mb": getattr(module, "MAX_UPLOAD_MB", MAX_UPLOAD_MB), "samples": samples}
+
+
+@app.route("/")
+def index():
+    return render_template("index.html", settings={k: page_settings(k) for k in PIPELINES})
 
 
 @app.route("/api/health")
