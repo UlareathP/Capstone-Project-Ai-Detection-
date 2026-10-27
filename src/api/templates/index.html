@@ -215,6 +215,34 @@
     .tab { flex: 1; justify-content: center; padding: 9px 8px; }
     .appbar .pill { display: none; }
   }
+  /* Additional mobile layout fixes */
+@media (max-width: 520px) {
+  .grid,
+  .card,
+  .card-body {
+    min-width: 0;
+  }
+
+  .card-body {
+    overflow-wrap: anywhere;
+  }
+
+  .file-info {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .file-name {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  img,
+  video,
+  audio {
+    max-width: 100%;
+  }
+} 
 </style>
 </head>
 <body>
@@ -257,7 +285,7 @@
   <div class="grid" role="tabpanel">
     <!-- Upload -->
     <section class="card">
-      <div class="card-head"><h2 id="upload-title"></h2><span class="hint">Stays on this computer</span></div>
+      <div class="card-head"><h2 id="upload-title"><span class="hint">Processed by the application server</span></div>
       <div class="card-body">
         <div class="notice warn" id="unavailable" hidden>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
@@ -488,19 +516,58 @@ function selectTab(kind) {
   else { setPanel("empty"); }
 }
 
+
+
 function pick(f) {
   if (!f) return;
-  const st = state[current], s = SETTINGS[current];
-  if (f.size > s.max_mb * 1048576) {
-    st.error = `That file is larger than ${s.max_mb} MB.`;
-    showError(st.error);
+
+  const st = state[current];
+  const s = SETTINGS[current];
+
+  // Clear the previous file, result and error.
+  if (st.url) URL.revokeObjectURL(st.url);
+  st.file = null;
+  st.url = null;
+  st.result = null;
+  st.error = "";
+  
+  setPanel("empty");
+
+  const allowedExtensions = {
+    image: [".jpg", ".jpeg", ".png", ".webp"],
+    video: [".mp4", ".avi", ".mov", ".mkv"],
+    audio: [".wav", ".mp3", ".m4a", ".ogg", ".flac", ".opus"]
+  };
+
+  const extension = f.name.toLowerCase().slice(
+    f.name.lastIndexOf(".")
+  );
+
+  if (!allowedExtensions[current].includes(extension)) {
+    st.error = `Invalid file type. Please upload a supported ${current} file.`;
+    selectTab(current);
     return;
   }
-  if (st.url) URL.revokeObjectURL(st.url);
-  st.file = f; st.url = URL.createObjectURL(f); st.result = null; st.error = "";
+
+  if (f.size === 0) {
+    st.error = "This file is empty. Please choose another file.";
+    selectTab(current);
+    return; 
+  }
+
+  if (f.size > s.max_mb * 1048576) {
+    st.error = `That file is larger than ${s.max_mb} MB.`;
+    selectTab(current);
+    return;
+  }
+
+  // File passed validation.
+  st.file = f;
+  st.url = URL.createObjectURL(f);
+
   selectTab(current);
 }
-
+ 
 function runSteps() {
   const steps = [...$("steps").children];
   let i = 0;
@@ -579,7 +646,7 @@ async function analyse() {
     const r = await res.json().catch(() => ({ error: "The server returned an unexpected response." }));
     if (r.error) st.error = r.error; else st.result = r;
   } catch (e) {
-    st.error = "Could not reach the server. Is it still running in your terminal?";
+    st.error = "Unable to connect to the analysis server. Please check your connection and try again.";
   } finally {
     st.busy = false;
     clearInterval(stepTimer);
