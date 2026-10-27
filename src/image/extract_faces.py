@@ -81,11 +81,17 @@ def main():
                 if i % 500 == 0 or i == len(images):
                     print(f"[{label}/{source_split}] {i}/{len(images)} images, {missed} without a face")
 
+    # Keep the other datasets already in the manifest; replace only this dataset's rows
     os.makedirs(FACES_DIR, exist_ok=True)
-    with open(os.path.join(FACES_DIR, "manifest.csv"), "w", newline="") as f:
+    manifest = os.path.join(FACES_DIR, "manifest.csv")
+    others = []
+    if os.path.exists(manifest):
+        with open(manifest, newline="") as f:
+            others = [r for r in csv.DictReader(f) if r["dataset"] != dataset]
+    with open(manifest, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=["image_id", "dataset", "image", "label", "source_split", "n_faces"])
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(others + rows)
 
     for label in ("fake", "real"):
         sel = [r for r in rows if r["label"] == label]

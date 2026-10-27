@@ -25,6 +25,9 @@ EPOCHS = 15
 LR_HEAD = 0.001
 LR_BACKBONE = 0.0001
 PATIENCE = 3
+# Small extra datasets are repeated in the training set, so a handful of images
+# isn't drowned out by thousands of rvf10k images (augmentation varies each copy)
+OVERSAMPLE = {"generated_photos": 25}
 
 random.seed(SEED)
 np.random.seed(SEED)
@@ -49,7 +52,8 @@ for s, ims in by_split.items():
     print(f"{s}: {len(ims)} images {counts}")
 print(f"skipped (no face found): {len(images) - len(with_face)}")
 
-train_dataset = FaceDataset(by_split["train"], train_transform)
+train_images = [im for im in by_split["train"] for _ in range(OVERSAMPLE.get(im["dataset"], 1))]
+train_dataset = FaceDataset(train_images, train_transform)
 valid_dataset = FaceDataset(by_split["valid"], eval_transform)
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 valid_loader = DataLoader(valid_dataset, batch_size=BATCH_SIZE, shuffle=False)
@@ -108,7 +112,8 @@ with open(log_path, "a", newline="") as f:
         datetime.now().isoformat(timespec="seconds"),
         "+".join(sorted({im["dataset"] for im in images})),
         "original_valid_folder",
-        "resnet18_layer4_unfrozen+augmentation+quality_degrade+jpeg75_images+yunet_face_crop",
+        "resnet18_layer4_unfrozen+augmentation+quality_degrade+jpeg75_images+yunet_face_crop"
+        + "".join(f"+oversample_{ds}x{n}" for ds, n in OVERSAMPLE.items()),
         f"{best_val_acc:.4f}",
     ])
 print(f"Logged result to {log_path}. Run src/image/evaluate.py for test-set results.")

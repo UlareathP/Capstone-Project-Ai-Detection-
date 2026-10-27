@@ -35,6 +35,13 @@ report = classification_report(labels, preds, labels=[0, 1], target_names=CLASS_
 # roc_auc_score expects scores for the positive class (label 1 = real)
 auc = roc_auc_score(labels, [1 - p for p in probs]) if len(set(labels)) == 2 else float("nan")
 text = f"=== image-level (n={len(labels)}) ===\n{report}ROC AUC: {auc:.4f}\n"
+text += "\n=== accuracy per dataset and class ===\n"
+for ds in sorted({im["dataset"] for im in test_images}):
+    for c, cls in enumerate(CLASS_NAMES):
+        idx = [i for i, im in enumerate(test_images) if im["dataset"] == ds and labels[i] == c]
+        if idx:
+            right = sum(preds[i] == c for i in idx)
+            text += f"{ds:18} {cls:5} {right}/{len(idx)} correct ({right / len(idx):.1%})\n"
 
 cm = confusion_matrix(labels, preds, labels=[0, 1])
 fig, ax = plt.subplots(figsize=(5, 5))

@@ -87,17 +87,19 @@ def make_splits(images):
     """Assign each image to train/valid/test. The dataset's own `valid` folder is the
     held-out test set; 15% of its `train` folder becomes validation. The split is drawn
     over every image (with or without a detected face), so it doesn't shift when the
-    face detector misses one."""
-    original_train = defaultdict(list)
+    face detector misses one. Each dataset is split on its own, so adding a dataset
+    doesn't change which images of the other datasets land in validation."""
+    original_train = defaultdict(lambda: defaultdict(list))
     for im in sorted(images, key=lambda im: im["image"]):
         if im["source_split"] == "train":
-            original_train[im["label"]].append(im["image"])
-    val = stratified_val(original_train)
+            original_train[im["dataset"]][im["label"]].append(im["image"])
+    val = {(ds, cls, name) for ds, by_class in original_train.items()
+           for cls, name in stratified_val(by_class)}
     out = []
     for im in images:
         if im["source_split"] == "valid":
             split = "test"
-        elif (im["label"], im["image"]) in val:
+        elif (im["dataset"], im["label"], im["image"]) in val:
             split = "valid"
         else:
             split = "train"

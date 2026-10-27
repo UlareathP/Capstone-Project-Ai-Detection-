@@ -1,0 +1,15 @@
+=== image-level (n=3010) ===
+              precision    recall  f1-score   support
+
+        fake       0.91      0.90      0.91      1510
+        real       0.90      0.92      0.91      1500
+
+    accuracy                           0.91      3010
+   macro avg       0.91      0.91      0.91      3010
+weighted avg       0.91      0.91      0.91      3010
+ROC AUC: 0.9694
+
+=== accuracy per dataset and class ===
+generated_photos   fake  6/10 correct (60.0%)
+rvf10k             fake  1356/1500 correct (90.4%)
+rvf10k             real  1373/1500 correct (91.5%)
