@@ -131,15 +131,21 @@ def make_splits(clips):
     unseen attacks A17-A32). The official train (attacks A01-A08) and development (A09-A16)
     partitions are pooled, so the model learns from 16 attack types instead of 8, then
     split into train/valid by speaker (no speaker in both), keeping the share of each
-    attack type similar in both parts - like the identity-grouped split in the video pipeline."""
+    attack type similar in both parts - like the identity-grouped split in the video pipeline.
+    Other datasets (e.g. SceneFake) follow the same rule: their eval folder is test, and
+    train+dev are pooled and split by group. Each dataset is split on its own, so adding
+    one doesn't move any ASVspoof 5 clip between train and valid."""
     split = {i: "test" for i, c in enumerate(clips) if c["source_split"] == "test"}
-    pool = [i for i, c in enumerate(clips) if c["source_split"] != "test"]
-    sgkf = StratifiedGroupKFold(n_splits=VAL_FOLDS, shuffle=True, random_state=SEED)
-    tr, va = next(sgkf.split(pool, [clips[i]["attack_id"] for i in pool], [clips[i]["speaker_id"] for i in pool]))
-    for j in tr:
-        split[pool[j]] = "train"
-    for j in va:
-        split[pool[j]] = "valid"
+    for dataset in dict.fromkeys(c["dataset"] for c in clips):  # keeps manifest order
+        pool = [i for i, c in enumerate(clips) if c["source_split"] != "test" and c["dataset"] == dataset]
+        if not pool:
+            continue
+        sgkf = StratifiedGroupKFold(n_splits=VAL_FOLDS, shuffle=True, random_state=SEED)
+        tr, va = next(sgkf.split(pool, [clips[i]["attack_id"] for i in pool], [clips[i]["speaker_id"] for i in pool]))
+        for j in tr:
+            split[pool[j]] = "train"
+        for j in va:
+            split[pool[j]] = "valid"
     return [{**c, "split": split[i]} for i, c in enumerate(clips)]
 
 

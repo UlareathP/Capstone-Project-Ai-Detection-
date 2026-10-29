@@ -1,3 +1,4 @@
 timestamp,datasets,test_dataset,config,best_val_clip_acc,best_val_segment_acc
 2026-10-22T16:36:17,asvspoof5,official_asvspoof5_partitions,resnet18_layer4_unfrozen+specmask+quality_degrade+mp3_64k_clips+silence_trim+mean_clip_prob,0.8000,0.7691
 2026-10-23T10:27:01,asvspoof5,official_asvspoof5_eval_partition,resnet18_layer4_unfrozen+specmask+quality_degrade+mp3_64k_clips+silence_trim+mean_clip_prob+pooled_train_dev_speaker_split+attack_balanced_sampler,0.9867,0.9589
+2026-10-28T18:55:05,asvspoof5+scenefake,asvspoof5_eval+scenefake_eval,resnet18_layer4_unfrozen+specmask+quality_degrade+mp3_64k_clips+silence_trim+mean_clip_prob+pooled_train_dev_speaker_split+attack_balanced_sampler,0.9809,0.9579

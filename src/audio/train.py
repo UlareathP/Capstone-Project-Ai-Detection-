@@ -115,7 +115,7 @@ with open(log_path, "a", newline="") as f:
     writer.writerow([
         datetime.now().isoformat(timespec="seconds"),
         "+".join(sorted({c["dataset"] for c in clips})),
-        "official_asvspoof5_eval_partition",
+        "+".join(f"{ds}_eval" for ds in sorted({c["dataset"] for c in clips})),
         "resnet18_layer4_unfrozen+specmask+quality_degrade+mp3_64k_clips+silence_trim+mean_clip_prob"
         "+pooled_train_dev_speaker_split+attack_balanced_sampler",
         f"{best_val_acc:.4f}",

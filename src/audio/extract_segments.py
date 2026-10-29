@@ -7,9 +7,15 @@ differs between real and fake clips; a model could cheat by measuring it.
 
 Usage (from the repo root):
     python src/audio/extract_segments.py --src data/audio_normalized --meta data/audio_meta
+    python src/audio/extract_segments.py --src data/audio_normalized/scenefake --folders
 
---src holds train/, validation/ and test/ folders of clips; --meta holds the
-<split>_subset_final.csv label files (bonafide = real, spoof = fake).
+With --meta (ASVspoof 5): --src holds train/, validation/ and test/ folders of clips and
+--meta holds the <split>_subset_final.csv label files (bonafide = real, spoof = fake).
+With --folders (e.g. SceneFake): --src holds <train|dev|eval>/<real|fake>/ folders, and the
+folder name of --src is used as the dataset name.
+
+Each run replaces only its own dataset's rows in the manifest, so datasets can be added
+one at a time.
 """
 import os
 import csv
@@ -73,17 +79,17 @@ def process_clip(path, out_dir):
     return saved
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--src", required=True, help="folder with train/, validation/, test/ clips")
-    parser.add_argument("--meta", required=True, help="folder with <split>_subset_final.csv files")
-    args = parser.parse_args()
+MANIFEST_FIELDS = ["clip_id", "dataset", "clip", "label", "source_split",
+                   "speaker_id", "attack_id", "codec", "n_segments"]
+FOLDER_SPLITS = {"train": "train", "dev": "validation", "eval": "test"}
 
+
+def rows_from_asvspoof(src, meta_dir):
     rows = []
     for source_split in ("train", "validation", "test"):
-        with open(os.path.join(args.meta, f"{source_split}_subset_final.csv"), newline="") as f:
+        with open(os.path.join(meta_dir, f"{source_split}_subset_final.csv"), newline="") as f:
             meta = list(csv.DictReader(f))
-        folder = os.path.join(args.src, source_split)
+        folder = os.path.join(src, source_split)
         files = {os.path.splitext(n)[0]: n for n in os.listdir(folder)} if os.path.isdir(folder) else {}
         missing = 0
         for i, m in enumerate(meta, 1):
@@ -104,13 +110,65 @@ def main():
                 print(f"[{source_split}] {i}/{len(meta)} clips", flush=True)
         if missing:
             print(f"  !! {missing} {source_split} clips listed in the metadata were not found in {folder}")
+    return rows
 
+
+def rows_from_folders(src, dataset):
+    """<train|dev|eval>/<real|fake>/ folders. File names like SceneFake's A_123_5_C.wav:
+    the serial (123) groups a clip with its other versions so they stay in one split, and
+    the last letter (the scene-swapping method) is used as the attack type."""
+    rows = []
+    for folder_split, source_split in FOLDER_SPLITS.items():
+        for label in ("fake", "real"):
+            folder = os.path.join(src, folder_split, label)
+            if not os.path.isdir(folder):
+                continue
+            names = sorted(os.listdir(folder))
+            for i, name in enumerate(names, 1):
+                stem = os.path.splitext(name)[0]
+                parts = stem.split("_")
+                serial = "_".join(parts[:2])
+                attack = "bonafide" if label == "real" else f"{dataset}_{parts[-1] if len(parts) >= 4 else 'fake'}"
+                clip_id = f"{dataset}__{stem}"
+                n = process_clip(os.path.join(folder, name), os.path.join(SEGMENTS_DIR, label, clip_id))
+                if n:
+                    rows.append({"clip_id": clip_id, "dataset": dataset, "clip": stem, "label": label,
+                                 "source_split": source_split, "speaker_id": f"{dataset}_{serial}",
+                                 "attack_id": attack, "codec": "-", "n_segments": n})
+                else:
+                    print(f"  !! no audio decoded, skipping {name}")
+                if i % 250 == 0 or i == len(names):
+                    print(f"[{folder_split}/{label}] {i}/{len(names)} clips", flush=True)
+    return rows
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--src", required=True, help="folder of clips (see the usage notes above)")
+    parser.add_argument("--meta", help="ASVspoof 5: folder with <split>_subset_final.csv files")
+    parser.add_argument("--folders", action="store_true", help="--src has <split>/<label>/ folders")
+    args = parser.parse_args()
+    if bool(args.meta) == args.folders:
+        parser.error("use either --meta (ASVspoof 5) or --folders")
+
+    if args.folders:
+        dataset = os.path.basename(os.path.normpath(args.src))
+        rows = rows_from_folders(args.src, dataset)
+    else:
+        dataset = DATASET
+        rows = rows_from_asvspoof(args.src, args.meta)
+
+    # Keep the other datasets already in the manifest; replace only this dataset's rows
     os.makedirs(SEGMENTS_DIR, exist_ok=True)
-    with open(os.path.join(SEGMENTS_DIR, "manifest.csv"), "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["clip_id", "dataset", "clip", "label", "source_split",
-                                               "speaker_id", "attack_id", "codec", "n_segments"])
+    manifest = os.path.join(SEGMENTS_DIR, "manifest.csv")
+    others = []
+    if os.path.exists(manifest):
+        with open(manifest, newline="") as f:
+            others = [r for r in csv.DictReader(f) if r["dataset"] != dataset]
+    with open(manifest, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=MANIFEST_FIELDS)
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(others + rows)
 
     for label in ("fake", "real"):
         sel = [r for r in rows if r["label"] == label]
