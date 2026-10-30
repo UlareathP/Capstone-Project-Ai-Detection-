@@ -1,0 +1,14 @@
+AUDIO MODEL - FoR (Fake-or-Real) results, 28 Oct 2026
+Model: ResNet18 on log-mel spectrograms, trained on for-norm + for-rerec (2000+1500 clips/class train).
+Test sets are FoR's own "testing" folders, never trained on.
+
+Clean FoR (for-norm test), 1200 clips: accuracy ~99.9%, ROC AUC 1.0000
+  confusion [[599 1][0 600]] (rows true fake/real, cols predicted fake/real)
+Re-recorded FoR (for-rerec test), 816 clips: accuracy 98%, ROC AUC 0.9993
+  fake P 0.98 R 0.99 | real P 0.99 R 0.98
+  confusion [[405 3][10 398]]
+
+Earlier clean-only model on the re-recorded test: accuracy 90%, ROC AUC 0.9946,
+  confusion [[330 78][2 406]]
+Clip-length check (clean-only model): 100% on short/long x real/fake.
+Saved ASVspoof 5 test (unseen attacks): ~64% clip accuracy, ROC AUC ~0.70.
