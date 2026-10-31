@@ -1,21 +1,27 @@
-=== segment-level (n=2400) ===
+=== segment-level (n=4695) ===
               precision    recall  f1-score   support
 
-        fake       0.72      0.41      0.53      1200
-        real       0.59      0.84      0.69      1200
+        fake       0.87      0.68      0.76      2350
+        real       0.74      0.90      0.81      2345
 
-    accuracy                           0.63      2400
-   macro avg       0.66      0.63      0.61      2400
-weighted avg       0.66      0.63      0.61      2400
-ROC AUC: 0.6824
+    accuracy                           0.79      4695
+   macro avg       0.80      0.79      0.79      4695
+weighted avg       0.80      0.79      0.79      4695
+ROC AUC: 0.8503
 
-=== clip-level (n=400) ===
+=== clip-level (n=800) ===
               precision    recall  f1-score   support
 
-        fake       0.80      0.38      0.52       200
-        real       0.59      0.91      0.72       200
+        fake       0.94      0.70      0.80       400
+        real       0.76      0.95      0.85       400
 
-    accuracy                           0.64       400
-   macro avg       0.70      0.64      0.62       400
-weighted avg       0.70      0.64      0.62       400
-ROC AUC: 0.6967
+    accuracy                           0.83       800
+   macro avg       0.85      0.83      0.83       800
+weighted avg       0.85      0.83      0.83       800
+ROC AUC: 0.8824
+
+=== clip-level accuracy per dataset and class ===
+asvspoof5    fake  87/200 correct (43.5%)
+asvspoof5    real  187/200 correct (93.5%)
+scenefake    fake  194/200 correct (97.0%)
+scenefake    real  195/200 correct (97.5%)

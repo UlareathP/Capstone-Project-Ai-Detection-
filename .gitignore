@@ -232,6 +232,7 @@ __marimo__/
 # Datasets & large media files
 data/
 datasets/
+01_Raw_Data/
 *.mp4
 *.avi
 *.mov
