@@ -1,140 +1,97 @@
-# Deepfake Detection System
+# Multimodal Deepfake Detection
 
-An AI system that detects deepfake and AI-generated **images, videos and audio**, built as part
-of the UC ITS Capstone project. Each detector turns its input into a form a ResNet18 network can
-score (face crops for images and video, log-mel spectrograms for audio) and returns a
-real / fake verdict with a confidence. One web server runs all three.
+UC ITS Capstone, Project 2026-S2-72: **Multimodal AI Framework for Robust Detection of Deepfake and Synthetic Media**.
 
-## What is built
+One web app that checks an **image**, a **video** or an **audio** file and returns a real-or-fake verdict with a confidence score. Each media type has its own fine-tuned ResNet-18 model.
 
-| Detector | Input | Method | Folder |
-|---|---|---|---|
-| Image | photo | face crop, ResNet18 | `src/image/` |
-| Video | video clip | face crops from frames, ResNet18, scores combined per video | `src/video/` |
-| Audio | speech clip | 2-second log-mel spectrogram segments, ResNet18, scores averaged per clip | `src/audio/` |
-| Combined server | any of the above | one web page with Image / Video / Audio tabs, plus a JSON API for the mobile app | `src/api/server.py` |
+**Live app:** https://gokalpyldz-deepfake-detector.hf.space/
 
-Explainability: `src/gradcam.py` produces Grad-CAM heat maps for the image model, and the audio
-app shows the spectrogram of every segment it scores.
+**Quick links:** [User guide](docs/USER_GUIDE.md) | [Setup](#setup) | [Results](#results-held-out-test-data) | [Known limitations](#known-limitations)
 
-## Results
+## What each pipeline does
 
-All numbers are on held-out test data that the model never trained on.
-
-| Detector | Test set | Result |
+| Media | Steps | Final verdict |
 |---|---|---|
-| Image | rvf10k, 3,010 images | 91% accuracy, ROC AUC 0.969 |
-| Video | 18 videos (570 frames) | 89% video-level accuracy, AUC 0.926 (79% at frame level) |
-| Audio | clean Fake-or-Real, 1,200 clips | 100% |
-| Audio | re-recorded Fake-or-Real, 816 clips | 100% (a model trained without re-recorded audio scored 90%) |
-| Audio | ASVspoof 2019 LA, 2,000 clips with attack types not seen in training | 78.6% accuracy, ROC AUC 0.88 |
+| Image | Re-save in the training format, crop the largest face with YuNet, resize to 224 x 224, score with ResNet-18 | Fake probability of the face |
+| Video | Sample 32 frames, crop the face in each frame, score every face | Mean fake probability over the frames |
+| Audio | Trim silence, take six 2-second segments, convert each to a log-mel spectrogram, score every segment | Mean fake probability over the segments |
 
-Detailed reports are in `notebooks/`.
+The web page also shows the per-frame (video) and per-segment (audio) fake scores.
 
-## Known limitations
+## Results (held-out test data)
 
-- **Audio generalisation is the main weakness.** On ASVspoof 2019 LA, the attack types in the test
-  set are mostly different from those in training. The model catches about 64% of those fakes and
-  almost none of some attack types (for example A10: 9-16% caught in two training runs).
-  Training on 25% more data did not change this (80% to 79%).
-- **The Fake-or-Real scores are not proof of general deepfake detection.** That benchmark is easy
-  (real and fake clips come from different sources), and the same model drops to about 79% on a
-  harder test.
-- Each model works best on the kind of data it was trained on. Phone recordings or modern
-  commercial voices were not part of any test set.
-- The video test set is small (18 videos), so its figures carry wide uncertainty.
-- Novel generators that none of the training sets contain are not covered.
+| Media | Test size | Accuracy |
+|---|---|---|
+| Image | 3,010 images | 90.9% |
+| Video | 18 videos (small test) | 88.9% |
+| Audio | 800 clips | 83.0% |
+
+Details are in `notebooks/*_classification_report.txt`, `notebooks/*_experiment_log.csv` and `docs/`.
 
 ## Setup
 
-Python 3.12 was used.
+1. Install Python 3 and create a virtual environment:
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
+   ```
+   python3 -m venv .venv
+   source .venv/bin/activate        # Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
-### Model files
+2. Download the trained model files from the [GitHub release v1.0-models](https://github.com/UlareathP/Capstone-Project-Ai-Detection-/releases/tag/v1.0-models) and copy them into the `models/` folder (they are not stored in Git because of their size):
 
-Trained models are not stored in git because of their size (about 45 MB each). Download them
-from **[add link here, e.g. the v1.0-models release]** and place them in `models/`:
+   - `models/image_resnet18_best.pt`
+   - `models/video_resnet18_best.pt`
+   - `models/audio_resnet18_best.pt`
 
-| File | Used by |
-|---|---|
-| `image_resnet18_best.pt` | image detector |
-| `video_resnet18_best.pt` | video detector |
-| `audio_resnet18_best.pt` | audio detector (the combined model trained on Fake-or-Real and ASVspoof 2019 LA) |
+3. From the repository root, start the app:
 
-## Running
+   ```
+   python src/api/server.py
+   ```
 
-From the repository root:
+4. Open http://localhost:8000, choose the Image, Video or Audio tab, upload a file and press **Analyse**.
 
-```powershell
-python src/api/server.py        # all three detectors: http://127.0.0.1:8000
-```
+Run all commands from the repository root, because the model paths are relative.
+The first image or video run downloads the YuNet face detector (needs internet).
 
-The server listens on all network interfaces, so a phone on the same Wi-Fi can use
-`http://<this-computer's-IP>:8000`. Health check: `/api/health`. Prediction endpoint:
-`POST /api/predict/<kind>`, with `image`, `video` or `audio` as the kind.
+## Training and evaluation
 
-Each detector can also run on its own:
-
-| Command | Address |
-|---|---|
-| `python src/video/app.py` | http://127.0.0.1:5000 |
-| `python src/image/app.py` | http://127.0.0.1:5001 |
-| `python src/audio/app.py` | http://127.0.0.1:5002 |
-
-## Training the audio detector
-
-The datasets are too large for git. Download them separately:
-
-- **Fake-or-Real (FoR)**, versions `for-norm` and `for-rerec`
-- **ASVspoof 2019 LA** (the logical-access part, not PA)
-
-Then, from the repository root:
-
-```powershell
-python src/audio/prepare_mixed.py --norm <for-norm folder> --rerec <for-rerec folder> --raw data/part_for_raw --meta data/part_for_meta
-python src/audio/prepare_la.py --root <ASVspoof folder> --raw data/part_la_raw --meta data/part_la_meta --train-per-class 2000 --val-per-class 300 --test-per-class 1000
-python src/audio/merge_datasets.py --src data/part_for_raw data/part_for_meta - --src data/part_la_raw data/part_la_meta la_
-python src/audio/normalize_audio.py --src data/audio_raw --dst data/audio_normalized
-python src/audio/extract_segments.py --src data/audio_normalized --meta data/audio_meta
-python src/audio/train.py
-python src/audio/eval_all.py          # test each dataset separately
-python src/audio/check_attacks.py     # per-attack breakdown on ASVspoof
-```
-
-`train.py` writes `models/audio_resnet18_best.pt`, overwriting the previous file, so copy
-models you want to keep. The other scripts in `src/audio/` reproduce earlier experiments
-(`prepare_for.py`, `eval_rerec.py`, `check_length.py`). See `notebooks/audio_*.txt` for all
-audio results and `notebooks/audio_experiment_log.csv` for the run history.
-
-Training for the image and video detectors lives in `src/image/train.py` and
-`src/video/train.py`.
-
-## Repository layout
+Each media type has its own folder with the same scripts:
 
 ```
-src/
-  api/        combined web server and JSON API
-  image/      image detector (preprocess, train, evaluate, app)
-  video/      video detector
-  audio/      audio detector
-  gradcam.py  Grad-CAM visualisation
-notebooks/    results, reports and experiment logs
-models/       trained .pt files (not in git)
-data/         datasets and processed data (not in git)
+python src/<image|video|audio>/train.py
+python src/<image|video|audio>/evaluate.py
 ```
 
-## Goals
+Data preparation scripts (`extract_faces.py`, `extract_segments.py`, `normalize_*.py`) are in the same folders. Seeds are fixed (42) and the splits are saved (`models/baseline/splits.csv`, `notebooks/split_indices.json`) so results can be repeated.
 
-- Detect previously unseen deepfake generation techniques (partly met: see the audio
-  limitations above)
-- Maintain accuracy under real-world conditions such as compression, noise and re-recording
-  (met for audio re-recording; each model is trained with quality degradation)
+## Data
 
-## Authors
+All datasets are public. We used subsets that fit on student laptops.
 
-[add team members' names, and the licence if one applies]
+- Image: rvf10k (Kaggle) and Generated Photos
+- Video: DF40, DeepFaceLab face-swap subset
+- Audio: ASVspoof 5 and SceneFake
+
+## Known limitations
+
+- Image and video need a visible face.
+- Video was tested on only 18 videos and one face-swap method.
+- Audio catches far fewer ASVspoof 5 fakes (about 43.5%) than SceneFake fakes (about 97%), and was trained on English speech.
+- Heavy compression, noise or poor lighting make results less reliable.
+- Results are guidance, not proof. Do not use them as evidence for important decisions.
+- Uploaded files are deleted straight after analysis, but no authentication or privacy notice is built in.
+
+## Project structure
+
+```
+src/api/        Web server and page (all three tabs)
+src/image/      Image pipeline
+src/video/      Video pipeline
+src/audio/      Audio pipeline
+src/gradcam.py  Grad-CAM script (extra, not part of the app)
+notebooks/      Experiment logs, classification reports, split files
+models/         Model files (not in Git) and split files
+docs/           Image test report and confusion matrix
+```
