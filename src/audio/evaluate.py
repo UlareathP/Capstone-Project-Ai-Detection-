@@ -46,6 +46,17 @@ for level, labels, probs in (("segment", sl, sp), ("clip", cl, cp)):
     plt.savefig(f"notebooks/audio_confusion_matrix_{level}.png")
     plt.close(fig)
 
+# Clip-level accuracy per dataset and class (predict() keeps clips in test_clips order)
+lines.append("=== clip-level accuracy per dataset and class ===")
+clip_preds = [0 if p >= 0.5 else 1 for p in cp]
+for ds in sorted({c["dataset"] for c in test_clips}):
+    for k, cls in enumerate(CLASS_NAMES):
+        idx = [i for i, c in enumerate(test_clips) if c["dataset"] == ds and cl[i] == k]
+        if idx:
+            right = sum(clip_preds[i] == k for i in idx)
+            lines.append(f"{ds:12} {cls:5} {right}/{len(idx)} correct ({right / len(idx):.1%})")
+lines.append("")
+
 text = "\n".join(lines)
 print(text)
 with open("notebooks/audio_classification_report.txt", "w") as f:
