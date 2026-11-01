@@ -1,0 +1,5 @@
+AUDIO MODEL - combined (clean FoR + re-recorded FoR + ASVspoof 2019 LA), 30 Oct 2026
+Clean FoR test, 1200 clips: accuracy 100.0%, ROC AUC 1.0000, confusion [[600 0][0 600]]
+Re-recorded FoR test, 816 clips: accuracy 100.0%, ROC AUC 1.0000, confusion [[408 0][0 408]]
+ASVspoof 2019 LA test (unseen attacks), 2000 clips: accuracy 78.6%, ROC AUC 0.8836,
+  fake P 0.90 R 0.64, real P 0.72 R 0.93, confusion [[641 359][69 931]]

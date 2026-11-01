@@ -1,0 +1,21 @@
+=== segment-level (n=7290) ===
+              precision    recall  f1-score   support
+
+        fake       0.94      0.64      0.76      3990
+        real       0.68      0.95      0.79      3300
+
+    accuracy                           0.78      7290
+   macro avg       0.81      0.79      0.78      7290
+weighted avg       0.82      0.78      0.77      7290
+ROC AUC: 0.8963
+
+=== clip-level (n=2000) ===
+              precision    recall  f1-score   support
+
+        fake       0.95      0.60      0.74      1000
+        real       0.71      0.97      0.82      1000
+
+    accuracy                           0.79      2000
+   macro avg       0.83      0.79      0.78      2000
+weighted avg       0.83      0.79      0.78      2000
+ROC AUC: 0.9003

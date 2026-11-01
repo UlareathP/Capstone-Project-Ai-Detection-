@@ -23,7 +23,7 @@ from common import (CLASS_NAMES, MODEL_PATH, SEED, SPLITS_PATH, SegmentDataset, 
                     read_manifest, train_transform)
 
 BATCH_SIZE = 32
-EPOCHS = 15
+EPOCHS = 30
 LR_HEAD = 0.001
 LR_BACKBONE = 0.0001
 PATIENCE = 3
