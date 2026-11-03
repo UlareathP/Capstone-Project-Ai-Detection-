@@ -6,6 +6,7 @@ Usage (from the repo root):
 """
 import os
 import sys
+import argparse
 import torch
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
@@ -15,6 +16,12 @@ from sklearn.metrics import (ConfusionMatrixDisplay, classification_report,
 sys.path.insert(0, os.path.dirname(__file__))
 from common import (CLASS_NAMES, MODEL_PATH, FrameDataset, build_model, device,
                     eval_transform, predict, read_splits)
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--model", default=MODEL_PATH, help="model file to evaluate")
+args = parser.parse_args()
+MODEL_PATH = args.model
+print("Evaluating", MODEL_PATH)
 
 test_videos = [v for v in read_splits() if v["split"] == "test"]
 test_dataset = FrameDataset(test_videos, eval_transform)
@@ -42,6 +49,17 @@ for level, labels, probs in (("frame", fl, fp), ("video", vl, vp)):
     plt.tight_layout()
     plt.savefig(f"notebooks/video_confusion_matrix_{level}.png")
     plt.close(fig)
+
+# Video-level accuracy per dataset and class (predict() keeps videos in test_videos order)
+lines.append("=== video-level accuracy per dataset and class ===")
+video_preds = [0 if p >= 0.5 else 1 for p in vp]
+for ds in sorted({v["dataset"] for v in test_videos}):
+    for k, cls in enumerate(CLASS_NAMES):
+        idx = [i for i, v in enumerate(test_videos) if v["dataset"] == ds and vl[i] == k]
+        if idx:
+            right = sum(video_preds[i] == k for i in idx)
+            lines.append(f"{ds:14} {cls:5} {right}/{len(idx)} correct ({right / len(idx):.1%})")
+lines.append("")
 
 text = "\n".join(lines)
 print(text)

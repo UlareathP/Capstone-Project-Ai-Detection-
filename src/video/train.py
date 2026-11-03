@@ -17,19 +17,32 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 sys.path.insert(0, os.path.dirname(__file__))
-from common import (CLASS_NAMES, MODEL_PATH, SEED, SPLITS_PATH, FrameDataset, accuracy,
-                    build_model, device, eval_transform, make_splits, predict,
-                    read_manifest, train_transform)
+from common import (CLASS_NAMES, MODEL_PATH, SEED, SPLITS_PATH, FrameDataset,
+                    FramesPerVideoSampler, accuracy, build_model, device, eval_transform,
+                    make_splits, predict, read_manifest, train_transform)
 
 BATCH_SIZE = 32
-EPOCHS = 15
 LR_HEAD = 0.001
 LR_BACKBONE = 0.0001
-PATIENCE = 3
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--test-dataset", default=None, help="hold out this dataset (e.g. cdf) as the test set")
+parser.add_argument("--epochs", type=int, default=15)
+parser.add_argument("--patience", type=int, default=3, help="stop after this many epochs without improvement")
+parser.add_argument("--frames-per-epoch", type=int, default=8,
+                    help="random frames per video in each epoch (validation always uses all of them)")
+parser.add_argument("--unfreeze", nargs="+", default=["layer4"], choices=["layer2", "layer3", "layer4"],
+                    help="ResNet18 blocks to fine-tune (the rest keep their ImageNet weights)")
+parser.add_argument("--weight-decay", type=float, default=0.0,
+                    help="AdamW weight decay; > 0 discourages memorising the training videos")
+parser.add_argument("--label-smoothing", type=float, default=0.0,
+                    help="soften the 0/1 targets (e.g. 0.1) so the model is less over-confident")
+parser.add_argument("--out", default=MODEL_PATH, help="where to save the best model")
 args = parser.parse_args()
+FRAMES_PER_EPOCH, EPOCHS, PATIENCE = args.frames_per_epoch, args.epochs, args.patience
+print(f"Fine-tuning {args.unfreeze} + fc, up to {EPOCHS} epochs (patience {PATIENCE}), "
+      f"{FRAMES_PER_EPOCH} frames per video per epoch, weight decay {args.weight_decay}, "
+      f"label smoothing {args.label_smoothing}, saving to {args.out}")
 
 random.seed(SEED)
 np.random.seed(SEED)
@@ -55,20 +68,26 @@ for s, vs in by_split.items():
 
 train_dataset = FrameDataset(by_split["train"], train_transform)
 valid_dataset = FrameDataset(by_split["valid"], eval_transform)
-train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+sampler = FramesPerVideoSampler(train_dataset, FRAMES_PER_EPOCH)
+train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=sampler)
 valid_loader = DataLoader(valid_dataset, batch_size=BATCH_SIZE, shuffle=False)
-print(f"train frames: {len(train_dataset)}, valid frames: {len(valid_dataset)}")
+print(f"train frames: {len(train_dataset)} ({len(sampler)} used per epoch, "
+      f"{FRAMES_PER_EPOCH} per video), valid frames: {len(valid_dataset)}")
 
-# Weight the loss so an unbalanced real/fake frame count doesn't bias the model
-frame_counts = torch.bincount(torch.tensor([s[1] for s in train_dataset.samples]), minlength=2).float()
+# Weight the loss so an unbalanced real/fake video count doesn't bias the model
+labels_by_video = {vi: label for _, label, vi in train_dataset.samples}
+frame_counts = torch.zeros(2)
+for vi, idx in sampler.by_video.items():
+    frame_counts[labels_by_video[vi]] += min(FRAMES_PER_EPOCH, len(idx))
 class_weights = (frame_counts.sum() / (2 * frame_counts)).to(device)
 
-model = build_model(pretrained=True)
-criterion = nn.CrossEntropyLoss(weight=class_weights)
-optimizer = torch.optim.Adam([
-    {"params": model.layer4.parameters(), "lr": LR_BACKBONE},
-    {"params": model.fc.parameters(), "lr": LR_HEAD},
-])
+model = build_model(pretrained=True, trainable=args.unfreeze)
+criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=args.label_smoothing)
+param_groups = ([{"params": getattr(model, block).parameters(), "lr": LR_BACKBONE} for block in args.unfreeze]
+                + [{"params": model.fc.parameters(), "lr": LR_HEAD}])
+# Plain Adam when there is no weight decay keeps the original runs reproducible
+optimizer = (torch.optim.AdamW(param_groups, weight_decay=args.weight_decay) if args.weight_decay > 0
+             else torch.optim.Adam(param_groups))
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=1)
 
 best_val_acc, best_frame_acc, epochs_no_improve = -1.0, 0.0, 0
@@ -89,11 +108,11 @@ for epoch in range(EPOCHS):
     frame_acc, video_acc = accuracy(fl, fp), accuracy(vl, vp)
     scheduler.step(video_acc)
     print(f"Epoch {epoch+1}/{EPOCHS} - Loss: {running_loss/len(train_loader):.4f} "
-          f"- Val frame acc: {frame_acc:.4f} - Val video acc: {video_acc:.4f}")
+          f"- Val frame acc: {frame_acc:.4f} - Val video acc: {video_acc:.4f}", flush=True)
 
     if video_acc > best_val_acc:
         best_val_acc, best_frame_acc, epochs_no_improve = video_acc, frame_acc, 0
-        torch.save(model.state_dict(), MODEL_PATH)
+        torch.save(model.state_dict(), args.out)
         print(f"  -> New best model saved (val video acc={video_acc:.4f})")
     else:
         epochs_no_improve += 1
@@ -114,7 +133,10 @@ with open(log_path, "a", newline="") as f:
         datetime.now().isoformat(timespec="seconds"),
         "+".join(sorted({v["dataset"] for v in videos})),
         args.test_dataset or "random_identity_split",
-        "resnet18_layer4_unfrozen+augmentation+quality_degrade+crf30_videos+mean_video_prob",
+        f"resnet18_{'+'.join(args.unfreeze)}_unfrozen+augmentation+quality_degrade+crf30_videos+mean_video_prob"
+        f"+{FRAMES_PER_EPOCH}_frames_per_video_per_epoch+patience{PATIENCE}"
+        + (f"+weight_decay{args.weight_decay}" if args.weight_decay else "")
+        + (f"+label_smoothing{args.label_smoothing}" if args.label_smoothing else ""),
         f"{best_val_acc:.4f}",
         f"{best_frame_acc:.4f}",
     ])

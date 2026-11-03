@@ -5,6 +5,9 @@ Usage (from the repo root):
 
 Each source folder name ("cdf", "ff", ...) is used as the dataset name, so real and
 fake folders for the same dataset should share a name, e.g. data/real_videos/cdf.
+To name a dataset explicitly, write NAME=FOLDER (e.g. fomm-cdf=data/.../fomm/cdf);
+datasets ending in "-cdf" share Celeb-DF's people when the splits are made.
+Videos that already have face crops are skipped, so an interrupted run can be resumed.
 """
 import os
 import csv
@@ -66,6 +69,9 @@ def sample_faces(path, n_frames=FRAMES_PER_VIDEO):
 
 
 def process_video(path, out_dir):
+    done = [f for f in os.listdir(out_dir) if f.endswith(".jpg")] if os.path.isdir(out_dir) else []
+    if done:  # already extracted in an earlier (possibly interrupted) run
+        return len(done)
     os.makedirs(out_dir, exist_ok=True)
     saved = 0
     for idx, _, face in sample_faces(path):
@@ -76,20 +82,21 @@ def process_video(path, out_dir):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--fake", nargs="+", default=[], help="folders of fake videos")
-    parser.add_argument("--real", nargs="+", default=[], help="folders of real videos")
+    parser.add_argument("--fake", nargs="+", default=[], help="folders of fake videos, optionally as NAME=FOLDER")
+    parser.add_argument("--real", nargs="+", default=[], help="folders of real videos, optionally as NAME=FOLDER")
     args = parser.parse_args()
 
     rows = []
     for label, folders in (("fake", args.fake), ("real", args.real)):
-        for folder in folders:
-            dataset = os.path.basename(os.path.normpath(folder))
+        for spec in folders:
+            # "fomm-cdf=data/.../cdf" names the dataset explicitly; a bare folder uses its own name
+            dataset, folder = spec.split("=", 1) if "=" in spec else (os.path.basename(os.path.normpath(spec)), spec)
             videos = sorted(f for f in os.listdir(folder) if f.lower().endswith(VIDEO_EXTS))
             for i, name in enumerate(videos, 1):
                 stem = os.path.splitext(name)[0]
                 video_id = f"{dataset}__{stem}"
                 n = process_video(os.path.join(folder, name), os.path.join(FRAMES_DIR, label, video_id))
-                print(f"[{label}/{dataset}] {i}/{len(videos)} {name}: {n} faces")
+                print(f"[{label}/{dataset}] {i}/{len(videos)} {name}: {n} faces", flush=True)
                 if n:
                     rows.append({"video_id": video_id, "dataset": dataset, "video": stem, "label": label, "n_frames": n})
                 else:
