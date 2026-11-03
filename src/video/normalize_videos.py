@@ -3,7 +3,8 @@ separate real from fake (in the raw data, fakes have ~half the bitrate of reals)
 
 Usage (from the repo root):
     python src/video/normalize_videos.py --src data/video_subset --dst data/video_normalized
-Mirrors the folder structure of --src into --dst.
+Mirrors the folder structure of --src into --dst. Videos already re-encoded are skipped,
+so an interrupted run can be resumed.
 """
 import os
 import argparse
@@ -39,6 +40,9 @@ def main():
                 continue
             rel = os.path.relpath(os.path.join(root, name), args.src)
             out = os.path.join(args.dst, os.path.splitext(rel)[0] + ".mp4")
+            if os.path.exists(out) and os.path.getsize(out) > 0:  # done in an earlier run
+                done += 1
+                continue
             if normalize(os.path.join(root, name), out):
                 done += 1
             else:

@@ -1,21 +1,31 @@
-=== frame-level (n=570) ===
+=== frame-level (n=7487) ===
               precision    recall  f1-score   support
 
-        fake       0.73      0.95      0.82       288
-        real       0.92      0.64      0.75       282
+        fake       0.82      0.65      0.73      3135
+        real       0.78      0.90      0.84      4352
 
-    accuracy                           0.79       570
-   macro avg       0.83      0.79      0.79       570
-weighted avg       0.82      0.79      0.79       570
-ROC AUC: 0.8732
+    accuracy                           0.80      7487
+   macro avg       0.80      0.78      0.78      7487
+weighted avg       0.80      0.80      0.79      7487
+ROC AUC: 0.8613
 
-=== video-level (n=18) ===
+=== video-level (n=234) ===
               precision    recall  f1-score   support
 
-        fake       0.82      1.00      0.90         9
-        real       1.00      0.78      0.88         9
+        fake       0.87      0.67      0.76        98
+        real       0.80      0.93      0.86       136
 
-    accuracy                           0.89        18
-   macro avg       0.91      0.89      0.89        18
-weighted avg       0.91      0.89      0.89        18
-ROC AUC: 0.9259
+    accuracy                           0.82       234
+   macro avg       0.83      0.80      0.81       234
+weighted avg       0.83      0.82      0.82       234
+ROC AUC: 0.9061
+
+=== video-level accuracy per dataset and class ===
+cdf            fake  54/79 correct (68.4%)
+cdf            real  94/101 correct (93.1%)
+cdf-youtube    real  26/28 correct (92.9%)
+deepfacelab    fake  4/7 correct (57.1%)
+deepfacelab    real  6/7 correct (85.7%)
+faceswap-cdf   fake  2/3 correct (66.7%)
+facevid2vid-cdf fake  3/3 correct (100.0%)
+fomm-cdf       fake  3/6 correct (50.0%)

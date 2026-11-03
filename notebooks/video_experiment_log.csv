@@ -1,3 +1,6 @@
 timestamp,datasets,test_dataset,config,best_val_video_acc,best_val_frame_acc
 2026-10-17T17:30:43,deepfacelab,random_identity_split,resnet18_layer4_unfrozen+augmentation+mean_video_prob,0.8889,0.8490
 2026-10-18T12:18:28,deepfacelab,random_identity_split,resnet18_layer4_unfrozen+augmentation+quality_degrade+crf30_videos+mean_video_prob,0.8889,0.7882
+2026-11-01T14:33:06,cdf+cdf-youtube+deepfacelab+faceswap-cdf+facevid2vid-cdf+fomm-cdf,random_identity_split,resnet18_layer4_unfrozen+augmentation+quality_degrade+crf30_videos+mean_video_prob+8_frames_per_video_per_epoch,0.7552,0.7318
+2026-11-01T16:49:40,cdf+cdf-youtube+deepfacelab+faceswap-cdf+facevid2vid-cdf+fomm-cdf,random_identity_split,resnet18_layer3+layer4_unfrozen+augmentation+quality_degrade+crf30_videos+mean_video_prob+12_frames_per_video_per_epoch+patience5,0.7676,0.7311
+2026-11-02T09:38:48,cdf+cdf-youtube+deepfacelab+faceswap-cdf+facevid2vid-cdf+fomm-cdf,random_identity_split,resnet18_layer3+layer4_unfrozen+augmentation+quality_degrade+crf30_videos+mean_video_prob+12_frames_per_video_per_epoch+patience5+weight_decay0.05+label_smoothing0.1,0.7884,0.7644

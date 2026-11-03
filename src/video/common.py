@@ -4,7 +4,8 @@ import csv
 import random
 import torch
 from PIL import Image, ImageFilter
-from torch.utils.data import Dataset
+from collections import defaultdict
+from torch.utils.data import Dataset, Sampler
 from torchvision import transforms, models
 from sklearn.model_selection import StratifiedGroupKFold
 
@@ -70,9 +71,18 @@ def identity_of(video_stem):
     return video_stem.split("_")[0]
 
 
+def identity_source(dataset):
+    """Datasets made from the same source videos share people: Celeb-DF ("cdf") and the
+    FOMM / FaceVid2Vid / FaceSwap fakes generated from Celeb-DF ("fomm-cdf", ...) must use
+    one identity namespace, or the same person could land in train and test."""
+    return "cdf" if dataset == "cdf" or dataset.endswith("-cdf") else dataset
+
+
 def identities_in(video_stem):
     """Every person in a video: a fake contains the target AND the swapped-in source."""
     parts = video_stem.split("_")
+    if parts[0].upper() == "CDF" and len(parts) > 1:  # FaceSwap files: "CDF_id0_id21_0000"
+        parts = parts[1:]
     if parts[0].startswith("id"):  # Celeb-DF: last part is a clip number, not a person
         parts = [p for p in parts if p.startswith("id")]
     return parts
@@ -91,7 +101,7 @@ def identity_groups(videos):
 
     keys = []
     for v in videos:
-        people = [f'{v["dataset"]}:{p}' for p in identities_in(v["video"])]
+        people = [f'{identity_source(v["dataset"])}:{p}' for p in identities_in(v["video"])]
         for p in people[1:]:
             parent[find(p)] = find(people[0])
         keys.append(people[0])
@@ -156,11 +166,34 @@ class FrameDataset(Dataset):
         return self.transform(img), label, vi
 
 
-def build_model(pretrained=True):
+class FramesPerVideoSampler(Sampler):
+    """Each epoch, take k random frames from every video (fresh ones every epoch).
+    Keeps an epoch short on a CPU while still using all frames over several epochs,
+    and stops long videos from outweighing short ones."""
+
+    def __init__(self, dataset, k):
+        self.k = k
+        self.by_video = defaultdict(list)
+        for i, (_, _, vi) in enumerate(dataset.samples):
+            self.by_video[vi].append(i)
+
+    def __iter__(self):
+        picked = [i for idx in self.by_video.values() for i in random.sample(idx, min(self.k, len(idx)))]
+        random.shuffle(picked)
+        return iter(picked)
+
+    def __len__(self):
+        return sum(min(self.k, len(idx)) for idx in self.by_video.values())
+
+
+TRAINABLE_BLOCKS = ("layer4",)  # backbone blocks fine-tuned by default; the rest keep ImageNet weights
+
+
+def build_model(pretrained=True, trainable=TRAINABLE_BLOCKS):
     weights = models.ResNet18_Weights.DEFAULT if pretrained else None
     model = models.resnet18(weights=weights)
     for name, param in model.named_parameters():
-        param.requires_grad = name.startswith("layer4") or name.startswith("fc")
+        param.requires_grad = name.startswith(tuple(trainable)) or name.startswith("fc")
     model.fc = torch.nn.Linear(model.fc.in_features, 2)
     return model.to(device)
 
